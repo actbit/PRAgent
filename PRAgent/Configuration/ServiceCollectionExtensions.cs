@@ -50,6 +50,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(_ => aiSettings);
         services.AddSingleton(_ => prSettings);
 
+        // GitHub Token (for GitHubService constructor)
+        services.AddSingleton(_ => prSettings.GitHubToken ?? string.Empty);
+
         // GitHub Service
         services.AddSingleton<IGitHubService, GitHubService>();
 
