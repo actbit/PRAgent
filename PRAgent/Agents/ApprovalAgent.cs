@@ -10,10 +10,13 @@ public class ApprovalAgent : BaseAgent
         IKernelService kernelService,
         IGitHubService gitHubService,
         PullRequestDataService prDataService,
+        AISettings aiSettings,
         string? customSystemPrompt = null)
-        : base(kernelService, gitHubService, prDataService, AgentDefinition.ApprovalAgent, customSystemPrompt)
+        : base(kernelService, gitHubService, prDataService, aiSettings, AgentDefinition.ApprovalAgent, customSystemPrompt)
     {
     }
+
+    public new void SetLanguage(string language) => base.SetLanguage(language);
 
     public async Task<(bool ShouldApprove, string Reasoning, string? Comment)> DecideAsync(
         string owner,

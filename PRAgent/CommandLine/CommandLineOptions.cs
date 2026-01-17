@@ -11,6 +11,7 @@ public abstract record CommandOptions
     public string? Repo { get; init; }
     public int PrNumber { get; init; }
     public bool PostComment { get; init; }
+    public string? Language { get; init; } = "en";
 
     /// <summary>
     /// Validates the common options shared across all commands

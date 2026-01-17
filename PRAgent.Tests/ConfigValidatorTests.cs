@@ -125,7 +125,8 @@ public class ConfigValidatorTests
 
         // Assert
         Assert.False(result);
-        Assert.Contains("GitHub Token is required", errors);
+        Assert.NotEmpty(errors);
+        Assert.Contains("GitHub Token is required", errors[0]);
     }
 
     [Fact]

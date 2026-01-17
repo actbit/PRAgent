@@ -33,7 +33,8 @@ public class ReviewCommandHandler : ICommandHandler
             _options.Owner!,
             _options.Repo!,
             _options.PrNumber,
-            _options.PostComment);
+            _options.PostComment,
+            _options.Language);
 
         Console.WriteLine();
         Console.WriteLine(review);

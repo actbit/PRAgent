@@ -1,5 +1,6 @@
 using Microsoft.SemanticKernel;
 using Octokit;
+using PRAgent.Models;
 using PRAgent.Services;
 
 namespace PRAgent.Agents;
@@ -9,20 +10,24 @@ public abstract class BaseAgent
     protected readonly IKernelService KernelService;
     protected readonly IGitHubService GitHubService;
     protected readonly PullRequestDataService PRDataService;
+    protected readonly AISettings AISettings;
     protected AgentDefinition Definition;
 
     protected BaseAgent(
         IKernelService kernelService,
         IGitHubService gitHubService,
         PullRequestDataService prDataService,
+        AISettings aiSettings,
         AgentDefinition definition,
         string? customSystemPrompt = null)
     {
         KernelService = kernelService;
         GitHubService = gitHubService;
         PRDataService = prDataService;
+        AISettings = aiSettings;
 
-        Definition = definition;
+        // Apply language setting to the agent definition
+        Definition = definition.WithLanguage(aiSettings.Language);
 
         if (!string.IsNullOrEmpty(customSystemPrompt))
         {
@@ -33,6 +38,14 @@ public abstract class BaseAgent
                 Definition.Description
             );
         }
+    }
+
+    /// <summary>
+    /// Sets the language for AI responses dynamically
+    /// </summary>
+    protected void SetLanguage(string language)
+    {
+        Definition = Definition.WithLanguage(language);
     }
 
     protected Kernel CreateKernel()

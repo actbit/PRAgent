@@ -38,6 +38,11 @@ public static class CommandLineParser
                 case "-c":
                     options = options with { PostComment = true };
                     break;
+                case "--language":
+                case "-l":
+                    if (i + 1 < args.Length)
+                        options = options with { Language = args[++i] };
+                    break;
             }
         }
 
@@ -74,6 +79,11 @@ public static class CommandLineParser
                 case "--post-comment":
                 case "-c":
                     options = options with { PostComment = true };
+                    break;
+                case "--language":
+                case "-l":
+                    if (i + 1 < args.Length)
+                        options = options with { Language = args[++i] };
                     break;
             }
         }
@@ -124,6 +134,11 @@ public static class CommandLineParser
                 case "--post-comment":
                 case "-c":
                     options = options with { PostComment = true };
+                    break;
+                case "--language":
+                case "-l":
+                    if (i + 1 < args.Length)
+                        options = options with { Language = args[++i] };
                     break;
             }
         }

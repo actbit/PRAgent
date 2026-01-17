@@ -1,4 +1,5 @@
 using Microsoft.SemanticKernel;
+using PRAgent.Models;
 using PRAgent.Services;
 
 namespace PRAgent.Agents;
@@ -9,10 +10,13 @@ public class ReviewAgent : BaseAgent
         IKernelService kernelService,
         IGitHubService gitHubService,
         PullRequestDataService prDataService,
+        AISettings aiSettings,
         string? customSystemPrompt = null)
-        : base(kernelService, gitHubService, prDataService, AgentDefinition.ReviewAgent, customSystemPrompt)
+        : base(kernelService, gitHubService, prDataService, aiSettings, AgentDefinition.ReviewAgent, customSystemPrompt)
     {
     }
+
+    public new void SetLanguage(string language) => base.SetLanguage(language);
 
     public async Task<string> ReviewAsync(
         string owner,

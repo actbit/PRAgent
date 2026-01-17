@@ -42,7 +42,8 @@ public class ApproveCommandHandler : ICommandHandler
                 _options.Repo!,
                 _options.PrNumber,
                 _options.Threshold,
-                _options.PostComment);
+                _options.PostComment,
+                _options.Language);
 
             Console.WriteLine();
             Console.WriteLine("## Review Result");
