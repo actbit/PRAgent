@@ -26,7 +26,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          cache: 'PRAgent/packages.lock.json|PRAgent.Tests/packages.lock.json'
 
       - name: Restore
         run: |
