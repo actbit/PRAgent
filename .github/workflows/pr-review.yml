@@ -38,7 +38,7 @@ jobs:
           --pr "${{ github.event.pull_request.number }}" \
           --post-comment
         env:
-          AI_ENDPOINT: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
-          AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_MODEL_ID: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AISettings__Endpoint: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
+          AISettings__ApiKey: ${{ secrets.AI_API_KEY }}
+          AISettings__ModelId: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
+          PRSettings__GitHubToken: ${{ secrets.GITHUB_TOKEN }}

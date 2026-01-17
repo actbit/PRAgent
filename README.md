@@ -29,7 +29,6 @@ name: PR Review
 on:
   pull_request:
     types: [opened, synchronize]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -104,19 +103,37 @@ jobs:
 
 ### 共通設定（どちらの場合も）
 
-**GitHub Variables（オプション）**：
+**1. GitHub Secrets**：
 
 ```
 Settings → Secrets and variables → Actions → New repository secret
 ```
 
-| Secret | 値 |
-|--------|-----|
-| `AI_API_KEY` | OpenAI APIキー（`sk-...`） |
+| Secret | 値 | 取得方法 |
+|--------|-----|----------|
+| `AI_API_KEY` | OpenAI APIキー（`sk-...`） | [OpenAI API Keys](https://platform.openai.com/api-keys) |
 
-> **注**: `GITHUB_TOKEN` は自動的に提供されます
+> **注**: `GITHUB_TOKEN` はGitHub Actionsが自動的に提供します（設定不要）
 
-### 3. （オプション）GitHub Variablesを設定
+---
+
+**2. GitHub Personal Access Token（手動実行の場合のみ）**
+
+ローカル環境や手動実行で使用する場合、GitHub Personal Access Token が必要です：
+
+1. **GitHubでTokenを作成**:
+   ```
+   Settings → Developer settings → Personal access tokens → Tokens (classic)
+   → Generate new token (classic)
+   ```
+
+2. **権限を設定**:
+   - `repo`（フルコントロール）
+   - `pull_requests:write`（PRコメント・承認用）
+
+3. **Tokenをコピー**（一度しか表示されません）
+
+**GitHub Variables（オプション）**：
 
 ```
 Settings → Secrets and variables → Actions → Variables → New repository variable
@@ -126,14 +143,6 @@ Settings → Secrets and variables → Actions → Variables → New repository 
 |----------|------------------|
 | `AI_ENDPOINT` | `https://api.openai.com/v1` |
 | `AI_MODEL_ID` | `gpt-4o-mini` |
-
-### 4. PRを作成
-
-PRを作成するだけで、自動でレビューが実行されます！
-
-```
-PR作成 → PRAgent実行 → レビューコメント自動投稿
-```
 
 ---
 
@@ -184,11 +193,21 @@ dotnet build -c Release
 **方法1: 環境変数（推奨）**
 
 ```bash
-export AI_ENDPOINT=https://api.openai.com/v1
-export AI_API_KEY=your-api-key
-export AI_MODEL_ID=gpt-4o-mini
-export GITHUB_TOKEN=your-github-token
+# OpenAI API設定
+export AISettings__Endpoint=https://api.openai.com/v1
+export AISettings__ApiKey=your-api-key
+export AISettings__ModelId=gpt-4o-mini
+
+# GitHub Token（Personal Access Token）
+export PRSettings__GitHubToken=your-github-token
 ```
+
+> **GitHub Tokenの取得方法**:
+> ```
+> GitHub Settings → Developer settings → Personal access tokens →
+> Tokens (classic) → Generate new token (classic)
+> ```
+> 必要な権限: `repo`（フルコントロール）
 
 **方法2: appsettings.json**
 
@@ -331,16 +350,31 @@ OpenAI互換エンドポイントであれば動作します：
 PRAgent/
 ├── .github/
 │   └── workflows/              # GitHub Actionsワークフロー
-├── Plugins/
-│   ├── GitHub/                 # GitHub操作プラグイン
-│   └── PRAnalysis/             # AI分析プラグイン
-│       └── Prompts/            # プロンプトテンプレート
-├── Services/                   # サービス層
-├── Agents/                     # エージェント実装
-├── Models/                     # 設定モデル
-├── Configuration/              # 設定処理
-└── Program.cs                  # エントリーポイント
+│       ├── ci.yml              # CI（ビルド＆テスト）
+│       ├── pr-review.yml       # このリポジトリのPR用AIレビュー
+│       ├── pragent-native.yml  # 外部リポジトリ参照用（Native版）
+│       └── pragent-docker.yml  # 外部リポジトリ参照用（Docker版）
+├── PRAgent/
+│   ├── CommandLine/            # CLIコマンド解析・ハンドラー
+│   ├── Configuration/          # DI設定
+│   ├── Plugins/                # プラグイン
+│   │   ├── GitHub/             # GitHub操作プラグイン
+│   │   └── PRAnalysis/         # AI分析プラグイン
+│   ├── Services/               # サービス層
+│   ├── Agents/                 # エージェント実装
+│   ├── Models/                 # 設定モデル
+│   └── Program.cs              # エントリーポイント
+└── PRAgent.Tests/              # テストプロジェクト
 ```
+
+---
+
+## リファクタリングによる改善
+
+- **Program.cs**: 510行 → 120行（76%削減）
+- **CLIコマンド構造**: 専用ハンドラークラスに分離
+- **設定管理**: ServiceCollectionExtensionsに集約
+- **保守性**: 各機能が独立したクラスに配置
 
 ---
 
