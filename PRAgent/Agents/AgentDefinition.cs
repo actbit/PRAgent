@@ -36,11 +36,27 @@ public class AgentDefinition
             "ja" => """
                 IMPORTANT: Please respond in Japanese (日本語) for all output.
 
-                Also translate the following labels to Japanese:
+                **Output Format:**
+                - 問題ごとに分けてコメントを作成してください
+                - 各問題には以下を含めてください：
+                  * 影響を受けるファイル
+                  * 行番号（該当する場合）
+                  * 詳細な説明
+                  * 具体的なコード例
+                  &quot;  * 修正提案
+
+                **ラベル:**
                 - [CRITICAL] → [重要]
                 - [MAJOR] → [重大]
                 - [MINOR] → [軽微]
                 - [POSITIVE] → [良好]
+
+                **例:**
+                ### [重要] SQLインジェクションの脆弱性
+
+                **ファイル:** `src/Authentication.cs` (45行目)
+
+                **問題:** ...
                 """,
             "en" => "IMPORTANT: Please respond in English for all output.",
             "zh" => "IMPORTANT: Please respond in Chinese (中文) for all output.",
@@ -70,8 +86,32 @@ public class AgentDefinition
             - Adherence to best practices and design patterns
             - Test coverage and quality
 
-            Always provide specific examples and suggestions for improvement.
-            Use clear labels: [CRITICAL], [MAJOR], [MINOR], [POSITIVE]
+            **Output Format Requirements:**
+            - Organize findings by individual issue/problem
+            - Each issue should be a separate section
+            - Use severity labels: [CRITICAL], [MAJOR], [MINOR], [POSITIVE]
+            - For each issue, include:
+              * Affected file(s)
+              * Line numbers (if applicable)
+              * Detailed description
+              * Specific code examples showing the problem
+              * Concrete suggestions for improvement
+              * Expected behavior after fix
+
+            **Example Format:**
+            ### [CRITICAL] Security Issue: SQL Injection Vulnerability
+
+            **File:** `src/Authentication.cs` (lines 45-52)
+
+            **Problem:** ...
+            ```csharp
+            // Vulnerable code
+            ```
+
+            **Suggested Fix:**
+            ```csharp
+            // Fixed code
+            ```
             """,
         description: "Reviews pull requests for code quality, security, and best practices"
     );
