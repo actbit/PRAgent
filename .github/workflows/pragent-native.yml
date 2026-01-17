@@ -1,5 +1,5 @@
 # PRAgent - Native .NET CLI Version
-# PR作成/更新時に自動実行（高速・推奨）
+# PR作成/更新時に自動実行、または他のリポジトリから参照して使用
 
 name: PRAgent (Native)
 
@@ -20,6 +20,20 @@ on:
           - review
           - summary
           - approve
+  workflow_call:
+    inputs:
+      pr_number:
+        description: 'PR number'
+        required: true
+        type: number
+      command:
+        description: 'Command (review/summary/approve)'
+        required: false
+        type: string
+        default: 'review'
+    secrets:
+      ai_api_key:
+        required: true
 
 permissions:
   contents: read

@@ -17,17 +17,94 @@ AI-powered Pull Request Agent for GitHub - Semantic Kernelを使用したC#製PR
 
 ## クイックスタート（GitHub Actions）
 
-### 1. ワークフローファイルを追加
+### 方法1: Reusable Workflow（推奨）
 
-このリポジトリの `.github/workflows/` を自分のリポジトリにコピーします：
+ワークフローファイルをコピーせず、PRAgentリポジトリを参照して使用します。
+
+**自分のリポジトリ**に `.github/workflows/pr-review.yml` を作成：
+
+```yaml
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-agent:
+    uses: actbit/PRAgent/.github/workflows/pragent-native.yml@main
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      command: review
+    secrets:
+      ai_api_key: ${{ secrets.AI_API_KEY }}
+```
+
+**Secretsを設定**：
 
 ```
-.github/workflows/
-├── pragent-native.yml   # 自動実行（推奨）
-└── pragent-docker.yml   # 手動実行用
+Settings → Secrets and variables → Actions → New repository secret
 ```
 
-### 2. GitHub Secretsを設定
+| Secret | 値 |
+|--------|-----|
+| `AI_API_KEY` | OpenAI APIキー（`sk-...`） |
+
+**完了**: PRを作成するだけで自動レビューが実行されます。
+
+---
+
+### 他のジョブと組み合わせる例
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm test
+
+  pr-agent:
+    uses: actbit/PRAgent/.github/workflows/pragent-native.yml@main
+    needs: test  # テスト成功後のみ実行
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets:
+      ai_api_key: ${{ secrets.AI_API_KEY }}
+```
+
+---
+
+### 方法2: ワークフローファイルをコピー（カスタマイズ重視）
+
+完全なカスタマイズが必要な場合、ワークフローファイルをコピーして使用します。
+
+このリポジトリのファイルを自分のリポジトリにコピーします：
+
+- `.github/workflows/pragent-native.yml` - Native版（高速）
+- `.github/workflows/pragent-docker.yml` - Docker版（環境依存なし）
+
+### Docker版を参照して使う場合
+
+```yaml
+jobs:
+  pr-agent:
+    uses: actbit/PRAgent/.github/workflows/pragent-docker.yml@main
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      command: review
+    secrets:
+      ai_api_key: ${{ secrets.AI_API_KEY }}
+```
+
+### 共通設定（どちらの場合も）
+
+**GitHub Variables（オプション）**：
 
 ```
 Settings → Secrets and variables → Actions → New repository secret
@@ -80,12 +157,15 @@ Actionsタブ
 
 ### ワークフロー比較
 
-| 項目 | Native版 | Docker版 |
-|------|----------|----------|
-| 自動実行 | ✓ | - |
-| 手動実行 | ✓ | ✓ |
-| 実行速度 | **30秒〜1分** | 2〜4分（初回） |
-| 用途 | 通常使用 | トラブルシューティング |
+| 項目 | Native（参照） | Native（コピー） | Docker（参照） | Docker（コピー） |
+|------|----------------|------------------|----------------|------------------|
+| 導入方法 | `uses:` で参照 | ファイルをコピー | `uses:` で参照 | ファイルをコピー |
+| 自動実行 | ✓ | ✓ | - | - |
+| 手動実行 | ✓ | ✓ | ✓ | ✓ |
+| 実行速度 | **30秒〜1分** | **30秒〜1分** | 2〜4分 | 2〜4分 |
+| 更新の反映 | 自動 | 手動 | 自動 | 手動 |
+| カスタマイズ | 限定的 | 完全 | 限定的 | 完全 |
+| 用途 | 通常使用（推奨） | カスタムが必要 | トラブルシューティング | トラブルシューティング |
 
 ---
 
