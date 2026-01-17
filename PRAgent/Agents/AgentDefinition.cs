@@ -33,7 +33,15 @@ public class AgentDefinition
     {
         return language.ToLowerInvariant() switch
         {
-            "ja" => "IMPORTANT: Please respond in Japanese (日本語) for all output.",
+            "ja" => """
+                IMPORTANT: Please respond in Japanese (日本語) for all output.
+
+                Also translate the following labels to Japanese:
+                - [CRITICAL] → [重要]
+                - [MAJOR] → [重大]
+                - [MINOR] → [軽微]
+                - [POSITIVE] → [良好]
+                """,
             "en" => "IMPORTANT: Please respond in English for all output.",
             "zh" => "IMPORTANT: Please respond in Chinese (中文) for all output.",
             "ko" => "IMPORTANT: Please respond in Korean (한국어) for all output.",
