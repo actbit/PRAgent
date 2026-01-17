@@ -76,6 +76,9 @@ internal class Program
                     // Configuration Service
                     services.AddSingleton<IConfigurationService, ConfigurationService>();
 
+                    // Data Services
+                    services.AddSingleton<PullRequestDataService>();
+
                     // Agents
                     services.AddSingleton<ReviewAgent>();
                     services.AddSingleton<ApprovalAgent>();

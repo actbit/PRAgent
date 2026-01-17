@@ -3,30 +3,15 @@ using PRAgent.Services;
 
 namespace PRAgent.Agents;
 
-public class SummaryAgent
+public class SummaryAgent : BaseAgent
 {
-    private readonly IKernelService _kernelService;
-    private readonly IGitHubService _gitHubService;
-    private readonly AgentDefinition _definition;
-
     public SummaryAgent(
         IKernelService kernelService,
         IGitHubService gitHubService,
+        PullRequestDataService prDataService,
         string? customSystemPrompt = null)
+        : base(kernelService, gitHubService, prDataService, AgentDefinition.SummaryAgent, customSystemPrompt)
     {
-        _kernelService = kernelService;
-        _gitHubService = gitHubService;
-        _definition = AgentDefinition.SummaryAgent;
-
-        if (!string.IsNullOrEmpty(customSystemPrompt))
-        {
-            _definition = new AgentDefinition(
-                _definition.Name,
-                _definition.Role,
-                customSystemPrompt,
-                _definition.Description
-            );
-        }
     }
 
     public async Task<string> SummarizeAsync(
@@ -35,39 +20,16 @@ public class SummaryAgent
         int prNumber,
         CancellationToken cancellationToken = default)
     {
-        var kernel = _kernelService.CreateKernel(_definition.SystemPrompt);
+        var (pr, files, diff) = await GetPRDataAsync(owner, repo, prNumber);
+        var fileList = PullRequestDataService.FormatFileList(files);
 
-        var pr = await _gitHubService.GetPullRequestAsync(owner, repo, prNumber);
-        var files = await _gitHubService.GetPullRequestFilesAsync(owner, repo, prNumber);
-        var diff = await _gitHubService.GetPullRequestDiffAsync(owner, repo, prNumber);
-
-        var fileList = string.Join("\n", files.Select(f => $"- {f.FileName} ({f.Status}): +{f.Additions} -{f.Deletions}"));
-
-        var prompt = $"""
-            Create a concise summary of this pull request.
-
-            ## Pull Request
-            - Title: {pr.Title}
-            - Author: {pr.User.Login}
-            - Description: {pr.Body ?? "No description provided"}
-            - Branch: {pr.Head.Ref} -> {pr.Base.Ref}
-
-            ## Changed Files
-            {fileList}
-
-            ## Diff
-            {diff}
-
-            Provide a summary including:
-            1. **Purpose**: What this PR achieves
-            2. **Key Changes**: Main files/components modified
-            3. **Impact**: Areas affected
-            4. **Risk Assessment**: Low/Medium/High with justification
-            5. **Testing Notes**: Areas needing special attention
-
-            Keep under 300 words. Use markdown with bullet points.
+        var systemPrompt = """
+            You are a technical writer specializing in creating clear, concise documentation.
+            Your role is to summarize pull request changes accurately.
             """;
 
-        return await _kernelService.InvokePromptAsStringAsync(kernel, prompt, cancellationToken);
+        var prompt = PullRequestDataService.CreateSummaryPrompt(pr, fileList, diff, systemPrompt);
+
+        return await KernelService.InvokePromptAsStringAsync(CreateKernel(), prompt, cancellationToken);
     }
 }
