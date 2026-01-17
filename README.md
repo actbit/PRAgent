@@ -2,6 +2,8 @@
 
 AI-powered Pull Request Agent for GitHub - Semantic Kernelを使用したC#製PRレビュー・要約・承認ツール
 
+**サーバーレス・GitHub Actionsで動作**
+
 ## 機能
 
 - **PRレビュー**: AIがコード変更を分析し、構造化されたレビューを提供
@@ -11,9 +13,85 @@ AI-powered Pull Request Agent for GitHub - Semantic Kernelを使用したC#製PR
 - **OpenAI互換エンドポイント対応**: 柔軟なAIバックエンド選択
 - **リポジトリ別設定**: `.github/pragent.yml` でカスタムプロンプト・設定可能
 
-## インストール
+---
 
-### 方法1: ソースからビルド
+## クイックスタート（GitHub Actions）
+
+### 1. ワークフローファイルを追加
+
+このリポジトリの `.github/workflows/` を自分のリポジトリにコピーします：
+
+```
+.github/workflows/
+├── pragent-native.yml   # 自動実行（推奨）
+└── pragent-docker.yml   # 手動実行用
+```
+
+### 2. GitHub Secretsを設定
+
+```
+Settings → Secrets and variables → Actions → New repository secret
+```
+
+| Secret | 値 |
+|--------|-----|
+| `AI_API_KEY` | OpenAI APIキー（`sk-...`） |
+
+> **注**: `GITHUB_TOKEN` は自動的に提供されます
+
+### 3. （オプション）GitHub Variablesを設定
+
+```
+Settings → Secrets and variables → Actions → Variables → New repository variable
+```
+
+| Variable | 値（デフォルト） |
+|----------|------------------|
+| `AI_ENDPOINT` | `https://api.openai.com/v1` |
+| `AI_MODEL_ID` | `gpt-4o-mini` |
+
+### 4. PRを作成
+
+PRを作成するだけで、自動でレビューが実行されます！
+
+```
+PR作成 → PRAgent実行 → レビューコメント自動投稿
+```
+
+---
+
+## GitHub Actionsの使い方
+
+### 自動実行（Native版）
+
+PRを作成・更新すると自動で実行されます（30秒〜1分）
+
+### 手動実行
+
+```
+Actionsタブ
+    ├── PRAgent (Native)  → Run workflow  （高速）
+    └── PRAgent (Docker)  → Run workflow  （環境依存なし）
+```
+
+手動実行では、以下を選択できます：
+- PR番号
+- コマンド（review/summary/approve）
+
+### ワークフロー比較
+
+| 項目 | Native版 | Docker版 |
+|------|----------|----------|
+| 自動実行 | ✓ | - |
+| 手動実行 | ✓ | ✓ |
+| 実行速度 | **30秒〜1分** | 2〜4分（初回） |
+| 用途 | 通常使用 | トラブルシューティング |
+
+---
+
+## CLIでの使い方（ローカル開発）
+
+### インストール
 
 ```bash
 git clone <repository-url>
@@ -21,21 +99,9 @@ cd PRAgent
 dotnet build -c Release
 ```
 
-### 方法2: Docker
+### 設定
 
-```bash
-docker build -t pragent:latest .
-```
-
-### 方法3: NuGet（将来公開予定）
-
-```bash
-dotnet tool install --global PRAgent
-```
-
-## 設定
-
-### 環境変数で設定（推奨）
+**方法1: 環境変数（推奨）**
 
 ```bash
 export AI_ENDPOINT=https://api.openai.com/v1
@@ -44,58 +110,43 @@ export AI_MODEL_ID=gpt-4o-mini
 export GITHUB_TOKEN=your-github-token
 ```
 
-### appsettings.jsonで設定
-
-`appsettings.json`を作成：
+**方法2: appsettings.json**
 
 ```json
 {
   "AISettings": {
     "Endpoint": "https://api.openai.com/v1",
     "ApiKey": "your-api-key",
-    "ModelId": "gpt-4o-mini",
-    "MaxTokens": 4000,
-    "Temperature": 0.7
+    "ModelId": "gpt-4o-mini"
   },
   "PRSettings": {
-    "GitHubToken": "your-github-token",
-    "DefaultOwner": "",
-    "DefaultRepo": ""
+    "GitHubToken": "your-github-token"
   }
 }
 ```
 
-## 使い方
-
-### 基本的なコマンド
+### コマンド
 
 ```bash
-# ヘルプ表示
-PRAgent help
+# ヘルプ
+dotnet run -- help
 
 # PRレビュー
-PRAgent review --owner "org" --repo "repo" --pr 123
-
-# レビューをPRコメントとして投稿
-PRAgent review -o "org" -r "repo" -p 123 --post-comment
+dotnet run -- review --owner "org" --repo "repo" --pr 123 --post-comment
 
 # PR要約
-PRAgent summary --owner "org" --repo "repo" --pr 123
+dotnet run -- summary -o "org" -r "repo" -p 123 --post-comment
 
-# 要約をPRコメントとして投稿
-PRAgent summary -o "org" -r "repo" -p 123 --post-comment
-
-# 手動承認（コメント付き）
-PRAgent approve --owner "org" --repo "repo" --pr 123 --comment "LGTM"
+# 手動承認
+dotnet run -- approve -o "org" -r "repo" -p 123 --comment "LGTM"
 
 # AI判断で自動承認
-PRAgent approve --owner "org" --repo "repo" --pr 123 --auto
-
-# しきい値を指定して自動承認
-PRAgent approve -o "org" -r "repo" -p 123 --auto --threshold major
+dotnet run -- approve -o "org" -r "repo" -p 123 --auto --threshold minor
 ```
 
-### 承認しきい値 (threshold)
+---
+
+## 承認しきい値 (threshold)
 
 | 値 | 説明 |
 |---|---|
@@ -103,6 +154,8 @@ PRAgent approve -o "org" -r "repo" -p 123 --auto --threshold major
 | `major` | Major以上の問題がない場合のみ承認 |
 | `minor` | Minor以上の問題がない場合のみ承認（デフォルト） |
 | `none` | 常に承認 |
+
+---
 
 ## リポジトリ内設定ファイル
 
@@ -124,13 +177,11 @@ pragent:
   review:
     enabled: true
     auto_post: false
-    custom_prompt: "plugins/review-prompt.txt"
 
   # 要約設定
   summary:
     enabled: true
     post_as_comment: true
-    custom_prompt: "plugins/summary-prompt.txt"
 
   # 承認設定
   approve:
@@ -145,33 +196,22 @@ pragent:
     - "node_modules/**"
 ```
 
-### 設定優先順位
+---
 
-1. コマンドライン引数
-2. 環境変数
-3. `.github/pragent.yml`（リポジトリ内設定）
-4. `~/.pragent/config.json`（ユーザー設定）
-5. `appsettings.json`（デフォルト設定）
+## コスト
 
-## Docker使用方法
+### GitHub Actions（推奨）
 
-```bash
-# 環境変数で設定
-docker run --rm \
-  -e AI_ENDPOINT=https://api.openai.com/v1 \
-  -e AI_API_KEY=your-key \
-  -e GITHUB_TOKEN=your-token \
-  pragent:latest \
-  review --owner "org" --repo "repo" --pr 123
+| プラン | 無料枠 | 超過料金 |
+|--------|--------|----------|
+| パブリックリポジトリ | **無料（無制限）** | - |
+| プライベートリポジトリ | 2000分/月 | $0.008/分 |
 
-# 複数行コマンド
-docker run --rm \
-  -e AI_ENDPOINT=$AI_ENDPOINT \
-  -e AI_API_KEY=$AI_API_KEY \
-  -e GITHUB_TOKEN=$GITHUB_TOKEN \
-  pragent:latest \
-  approve -o "org" -r "repo" -p 123 --auto
-```
+**実用例**: PRレビュー1回あたり1分 × 月100回 = 100分/月 → **無料**
+
+サーバーは一切不要です。
+
+---
 
 ## マルチエージェントアーキテクチャ
 
@@ -193,55 +233,42 @@ docker run --rm \
 - **ApprovalAgent**: 設定されたしきい値に基づき承認可否を判断
 - **SummaryAgent**: PR変更を簡潔に要約
 
+---
+
 ## 対応AIプロバイダ
 
-OpenAI互換エンドポートであれば動作します：
+OpenAI互換エンドポイントであれば動作します：
 
 - OpenAI (GPT-4, GPT-4o, GPT-4o-mini)
 - Azure OpenAI
-- Anthropic Claude（OpenAI互換レイヤー経由）
-- ローカルLLM (Ollama, LM Studio等)
+- 各種ローカルLLM (Ollama, LM Studio等)
+
+---
 
 ## プロジェクト構造
 
 ```
 PRAgent/
+├── .github/
+│   └── workflows/              # GitHub Actionsワークフロー
 ├── Plugins/
-│   ├── GitHub/              # GitHub操作プラグイン
-│   └── PRAnalysis/          # AI分析プラグイン
-│       └── Prompts/         # プロンプトテンプレート
-├── Services/                # サービス層
-├── Agents/                  # エージェント実装
-├── Models/                  # 設定モデル
-├── Configuration/           # 設定処理
-├── Validators/              # バリデーション
-└── Program.cs              # エントリーポイント
+│   ├── GitHub/                 # GitHub操作プラグイン
+│   └── PRAnalysis/             # AI分析プラグイン
+│       └── Prompts/            # プロンプトテンプレート
+├── Services/                   # サービス層
+├── Agents/                     # エージェント実装
+├── Models/                     # 設定モデル
+├── Configuration/              # 設定処理
+└── Program.cs                  # エントリーポイント
 ```
 
-## 開発
-
-```bash
-# デバッグビルド
-dotnet build -c Debug
-
-# テスト実行（将来実装予定）
-dotnet test
-
-# コードフォーマット
-dotnet format
-```
+---
 
 ## ライセンス
 
 MIT License
 
-## 貢献
-
-Pull Requestをお待ちしております。
-
-## 作者
-
-PRAgent Contributors
+---
 
 ## 関連プロジェクト
 
