@@ -31,12 +31,13 @@ jobs:
         run: dotnet build PRAgent/PRAgent.csproj -c Release
 
       - name: Run PRAgent Review
-        run: dotnet run --project PRAgent/PRAgent.csproj --configuration Release --no-build -- \
-          review \
-          --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
-          --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
-          --pr "${{ github.event.pull_request.number }}" \
-          --post-comment
+        run: |
+          dotnet PRAgent/bin/Release/net10.0/PRAgent.dll \
+            review \
+            --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
+            --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --post-comment
         env:
           AISettings__Endpoint: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
           AISettings__ApiKey: ${{ secrets.AI_API_KEY }}
