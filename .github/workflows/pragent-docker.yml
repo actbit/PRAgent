@@ -1,0 +1,66 @@
+# PRAgent - Docker Version
+# 手動実行専用（トラブルシューティング・検証用）
+#
+# 使い方: Actionsタブ → PRAgent (Docker) → Run workflow
+
+name: PRAgent (Docker)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number'
+        required: true
+        type: number
+      command:
+        description: 'Command'
+        required: true
+        type: choice
+        options:
+          - review
+          - summary
+          - approve
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pragent:
+    name: PRAgent Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: pragent:latest
+          cache: github-actions
+
+      - name: Run PRAgent
+        run: |
+          docker run --rm \
+            -e AI_ENDPOINT="${AI_ENDPOINT}" \
+            -e AI_API_KEY="${AI_API_KEY}" \
+            -e AI_MODEL_ID="${AI_MODEL_ID}" \
+            -e GITHUB_TOKEN="${GITHUB_TOKEN}" \
+            pragent:latest \
+            ${{ inputs.command }} \
+            --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
+            --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
+            --pr "${{ inputs.pr_number }}" \
+            --post-comment
+        env:
+          AI_ENDPOINT: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL_ID: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
