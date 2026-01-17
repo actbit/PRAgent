@@ -34,40 +34,113 @@ public class AgentDefinition
         return language.ToLowerInvariant() switch
         {
             "ja" => """
-                IMPORTANT: Please respond in Japanese (日本語) for all output.
-
-                **Output Format:**
+                **出力フォーマット:**
                 - 問題ごとに分けてコメントを作成してください
                 - 各問題には以下を含めてください：
                   * 影響を受けるファイル
                   * 行番号（該当する場合）
                   * 詳細な説明
                   * 具体的なコード例
-                  &quot;  * 修正提案
+                  * 修正提案
 
                 **ラベル:**
                 - [CRITICAL] → [重要]
                 - [MAJOR] → [重大]
                 - [MINOR] → [軽微]
                 - [POSITIVE] → [良好]
-
-                **例:**
-                ### [重要] SQLインジェクションの脆弱性
-
-                **ファイル:** `src/Authentication.cs` (45行目)
-
-                **問題:** ...
                 """,
-            "en" => "IMPORTANT: Please respond in English for all output.",
-            "zh" => "IMPORTANT: Please respond in Chinese (中文) for all output.",
-            "ko" => "IMPORTANT: Please respond in Korean (한국어) for all output.",
-            "es" => "IMPORTANT: Please respond in Spanish (Español) for all output.",
-            "fr" => "IMPORTANT: Please respond in French (Français) for all output.",
-            "de" => "IMPORTANT: Please respond in German (Deutsch) for all output.",
-            "it" => "IMPORTANT: Please respond in Italian (Italiano) for all output.",
-            "pt" => "IMPORTANT: Please respond in Portuguese (Português) for all output.",
-            "ru" => "IMPORTANT: Please respond in Russian (Русский) for all output.",
-            _ => "IMPORTANT: Please respond in English for all output."
+            "en" => """
+                **Output Format:**
+                - Organize findings by individual issue/problem
+                - Each issue should be a separate section
+                - For each issue, include:
+                  * Affected file(s)
+                  * Line numbers (if applicable)
+                  * Detailed description
+                  * Specific code examples
+                  * Concrete suggestions
+                """,
+            "zh" => """
+                **输出格式:**
+                - 按问题分组进行评论
+                - 每个问题应包含：
+                  * 受影响的文件
+                  * 行号（如适用）
+                  * 详细说明
+                  * 具体代码示例
+                  * 修改建议
+                """,
+            "ko" => """
+                **출력 형식:**
+                - 문제별로 댓글을 작성해주세요
+                - 각 문제에는 다음을 포함하세요:
+                  * 영향을 받는 파일
+                  * 라인 번호 (해당하는 경우)
+                  * 상세 설명
+                  * 구체적인 코드 예시
+                  * 수정 제안
+                """,
+            "es" => """
+                **Formato de Salida:**
+                - Organiza los hallazgos por problema individual
+                - Para cada problema, incluye:
+                  * Archivo(s) afectado(s)
+                  * Número de línea (si aplica)
+                  * Descripción detallada
+                  * Ejemplos de código específicos
+                  * Sugerencias concretas
+                """,
+            "fr" => """
+                **Format de Sortie:**
+                - Organisez les commentaires par problème
+                - Pour chaque problème, incluez:
+                  * Fichier(s) affecté(s)
+                  * Numéros de ligne (si applicable)
+                  * Description détaillée
+                  * Exemples de code spécifiques
+                  * Suggestions concrètes
+                """,
+            "de" => """
+                **Ausgabeformat:**
+                - Organisieren Sie die Ergebnisse nach einzelnen Problemen
+                - Für jedes Problem fügen Sie hinzu:
+                  * Betroffene Datei(en)
+                  * Zeilennummern (falls zutreffend)
+                  * Detaillierte Beschreibung
+                  * Spezifische Codebeispiele
+                  * Konkrete Verbesserungsvorschläge
+                """,
+            "it" => """
+                **Formato di Uscita:**
+                - Organizza i risultati per problema individuale
+                - Per ogni problema, includi:
+                  * File interessati
+                  * Numeri di riga (se applicabile)
+                  * Descrizione dettagliata
+                  * Esempi di codice specifici
+                  * Suggerimenti concreti
+                """,
+            "pt" => """
+                **Formato de Saída:**
+                - Organize os resultados por problema individual
+                - Para cada problema, inclua:
+                  * Arquivo(s) afetado(s)
+                  * Número da linha (se aplicável)
+                  * Descrição detalhada
+                  * Exemplos de código específicos
+                  * Sugestões concretas
+                """,
+            "ru" => """
+                **Формат вывода:**
+                - Организуйте результаты по отдельным проблемам
+                - Для каждой проблемы включайте:
+                  * Затронутые файлы
+                  * Номера строк (если применимо)
+                  * Подробное описание
+                  * Конкретные примеры кода
+                  * Конкретные предложения по улучшению
+                """,
+            _ => ""
         };
     }
 
@@ -85,33 +158,6 @@ public class AgentDefinition
             - Code organization and readability
             - Adherence to best practices and design patterns
             - Test coverage and quality
-
-            **Output Format Requirements:**
-            - Organize findings by individual issue/problem
-            - Each issue should be a separate section
-            - Use severity labels: [CRITICAL], [MAJOR], [MINOR], [POSITIVE]
-            - For each issue, include:
-              * Affected file(s)
-              * Line numbers (if applicable)
-              * Detailed description
-              * Specific code examples showing the problem
-              * Concrete suggestions for improvement
-              * Expected behavior after fix
-
-            **Example Format:**
-            ### [CRITICAL] Security Issue: SQL Injection Vulnerability
-
-            **File:** `src/Authentication.cs` (lines 45-52)
-
-            **Problem:** ...
-            ```csharp
-            // Vulnerable code
-            ```
-
-            **Suggested Fix:**
-            ```csharp
-            // Fixed code
-            ```
             """,
         description: "Reviews pull requests for code quality, security, and best practices"
     );
