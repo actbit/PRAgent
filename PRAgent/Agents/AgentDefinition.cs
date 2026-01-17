@@ -39,26 +39,47 @@ public class AgentDefinition
                 - 各問題には以下を含めてください：
                   * 影響を受けるファイル
                   * 行番号（該当する場合）
+                  * 変更の有無（☑ あり / ☑ なし）
                   * 詳細な説明
-                  * 具体的なコード例
-                  * 修正提案
+                  * 修正案（suggestion形式）
+                  * 閎連ファイル（GitHubリンク）
 
                 **ラベル:**
                 - [CRITICAL] → [重要]
                 - [MAJOR] → [重大]
                 - [MINOR] → [軽微]
                 - [POSITIVE] → [良好]
+
+                **例:**
+                ### [重要] SQLインジェクションの脆弱性
+
+                **ファイル:** `src/Authentication.cs` (45行目)
+
+                **変更の有無:** ☑ あり
+
+                **問題:**
+                ユーザー入力が直接SQLクエリリに連結されています...
+
+                **修正案:**
+                ```suggestion
+                // パラメータ化クエリを使用してください
+                var query = "SELECT * FROM Users WHERE Id = @Id";
+                ```
+
+                **GitHub:**
+                `https://github.com/org/repo/pull/1/files#L45-L52`
                 """,
             "en" => """
                 **Output Format:**
                 - Organize findings by individual issue/problem
-                - Each issue should be a separate section
                 - For each issue, include:
                   * Affected file(s)
                   * Line numbers (if applicable)
+                  * Changes made (☑ has changes / ☑ no changes)
                   * Detailed description
-                  * Specific code examples
-                  * Concrete suggestions
+                  * Suggestion (in suggestion format)
+                  * Related files (GitHub link if needed)
+                  * Use severity labels: [CRITICAL], [MAJOR], [MINOR], [POSITIVE]
                 """,
             "zh" => """
                 **输出格式:**
@@ -66,9 +87,10 @@ public class AgentDefinition
                 - 每个问题应包含：
                   * 受影响的文件
                   * 行号（如适用）
+                  * 变更（☑ 有 / ☑ 无）
                   * 详细说明
-                  * 具体代码示例
-                  * 修改建议
+                  * 建议（suggestion形式）
+                  * 相关文件（GitHub链接）
                 """,
             "ko" => """
                 **출력 형식:**
@@ -76,9 +98,10 @@ public class AgentDefinition
                 - 각 문제에는 다음을 포함하세요:
                   * 영향을 받는 파일
                   * 라인 번호 (해당하는 경우)
+                  * 변경 사항（☑ 있음 / ☑ 없음）
                   * 상세 설명
-                  * 구체적인 코드 예시
-                  * 수정 제안
+                  * 제안（suggestion 형식）
+                  * 관련 파일（GitHub 링크）
                 """,
             "es" => """
                 **Formato de Salida:**
@@ -86,19 +109,21 @@ public class AgentDefinition
                 - Para cada problema, incluye:
                   * Archivo(s) afectado(s)
                   * Número de línea (si aplica)
+                  * Cambios hechos (☑ cambios / ☑ sin cambios)
                   * Descripción detallada
-                  * Ejemplos de código específicos
-                  * Sugerencias concretas
+                  * Sugerencia (en formato suggestion)
+                  * Archivos relacionados (enlace GitHub si aplica)
                 """,
             "fr" => """
                 **Format de Sortie:**
                 - Organisez les commentaires par problème
                 - Pour chaque problème, incluez:
                   * Fichier(s) affecté(s)
-                  * Numéros de ligne (si applicable)
+                  * Numéros de ligne (si applica)
+                  * Modifications apportées (☑ modifications / ☑ sans modifications)
                   * Description détaillée
-                  * Exemples de code spécifiques
-                  * Suggestions concrètes
+                  * Suggestion (au format suggestion)
+                  * Fichiers liés (lien GitHub si nécessaire)
                 """,
             "de" => """
                 **Ausgabeformat:**
@@ -106,9 +131,10 @@ public class AgentDefinition
                 - Für jedes Problem fügen Sie hinzu:
                   * Betroffene Datei(en)
                   * Zeilennummern (falls zutreffend)
+                  * Änderungen (☑ Änderungen / ☑ keine Änderungen)
                   * Detaillierte Beschreibung
-                  * Spezifische Codebeispiele
-                  * Konkrete Verbesserungsvorschläge
+                  * Vorschlag (im Suggestion-Format)
+                  * Zugehörige Dateien (GitHub-Link wenn zutreffend)
                 """,
             "it" => """
                 **Formato di Uscita:**
@@ -116,9 +142,10 @@ public class AgentDefinition
                 - Per ogni problema, includi:
                   * File interessati
                   * Numeri di riga (se applicabile)
+                  * Modifiche apportate (☑ modifiche / ☑ nessuna modifica)
                   * Descrizione dettagliata
-                  * Esempi di codice specifici
-                  * Suggerimenti concreti
+                  * Suggerimento (in formato suggestion)
+                  * File correlati (link GitHub se applicabile)
                 """,
             "pt" => """
                 **Formato de Saída:**
@@ -126,9 +153,10 @@ public class AgentDefinition
                 - Para cada problema, inclua:
                   * Arquivo(s) afetado(s)
                   * Número da linha (se aplicável)
+                  * Mudanças feitas (☑ alterações / ☑ sem alterações)
                   * Descrição detalhada
-                  * Exemplos de código específicos
-                  * Sugestões concretas
+                  * Sugestão (em formato suggestion)
+                  * Arquivos relacionados (link GitHub se necessário)
                 """,
             "ru" => """
                 **Формат вывода:**
@@ -136,9 +164,10 @@ public class AgentDefinition
                 - Для каждой проблемы включайте:
                   * Затронутые файлы
                   * Номера строк (если применимо)
+                  * Изменения (☑ есть изменения / ☑ нет изменений)
                   * Подробное описание
-                  * Конкретные примеры кода
-                  * Конкретные предложения по улучшению
+                  * Предложение (в формате suggestion)
+                  * Связанные файлы (GitHub-ссылка при необходимости)
                 """,
             _ => ""
         };
