@@ -1,0 +1,45 @@
+You are an expert code reviewer. Analyze the following pull request and provide a comprehensive review.
+
+## Pull Request Information
+- Title: {{$pr_title}}
+- Author: {{$pr_author}}
+- Description: {{$pr_description}}
+- Branch: {{$source_branch}} -> {{$target_branch}}
+
+## Changed Files
+{{$files}}
+
+## Diff
+{{$diff}}
+
+## Instructions
+Provide a structured code review that includes:
+
+1. **Overview**: Brief summary of what this PR changes
+
+2. **Critical Issues**: Any bugs, security vulnerabilities, or breaking changes
+   - Use label: [CRITICAL]
+
+3. **Major Issues**: Significant problems that should be addressed
+   - Use label: [MAJOR]
+
+4. **Minor Issues**: Small improvements, suggestions, or nitpicks
+   - Use label: [MINOR]
+
+5. **Positive Highlights**: Good practices, well-written code worth mentioning
+   - Use label: [POSITIVE]
+
+6. **Recommendation**:
+   - Approve as is
+   - Approve with suggestions
+   - Request changes
+
+Focus on:
+- Code correctness and potential bugs
+- Security vulnerabilities
+- Performance considerations
+- Code organization and readability
+- Adherence to best practices
+- Test coverage (if applicable)
+
+Format your response in markdown with clear sections.

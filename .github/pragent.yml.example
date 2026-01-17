@@ -1,0 +1,44 @@
+# PRAgent Configuration Example
+# このファイルを .github/pragent.yml としてリポジトリに配置してください
+
+pragent:
+  enabled: true
+
+  # システムプロンプト（カスタマイズ可能）
+  system_prompt: |
+    あなたは経験豊富なコードレビュアーです。
+    以下の点に特に注意してください：
+    - セキュリティ脆弱性
+    - パフォーマンス問題
+    - コーディング規約への準拠
+    - テストカバレッジ
+
+  # レビュー設定
+  review:
+    enabled: true
+    auto_post: false  # trueで自動的にコメント投稿
+    # custom_prompt: "plugins/review-prompt.txt"  # カスタムプロンプトファイルのパス
+
+  # 要約設定
+  summary:
+    enabled: true
+    post_as_comment: true
+    # custom_prompt: "plugins/summary-prompt.txt"
+
+  # 承認設定
+  approve:
+    enabled: true
+    auto_approve_threshold: "minor"  # critical, major, minor, none
+    require_review_first: true  # レビュー後に承認判断
+
+  # 除外パス（レビュー対象外）
+  ignore_paths:
+    - "*.min.js"
+    - "*.min.css"
+    - "dist/**"
+    - "build/**"
+    - "node_modules/**"
+    - "bin/**"
+    - "obj/**"
+    - "*.generated.cs"
+    - "*.designer.cs"

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "PRAgent": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
