@@ -5,15 +5,19 @@ using PRAgent.Services;
 
 namespace PRAgent.Agents;
 
-public abstract class BaseAgent
+/// <summary>
+/// Base agent for review-related operations using sub-agents
+/// </summary>
+public abstract class ReviewAgentBase
 {
     protected readonly IKernelService KernelService;
     protected readonly IGitHubService GitHubService;
     protected readonly PullRequestDataService PRDataService;
     protected readonly AISettings AISettings;
+
     protected AgentDefinition Definition;
 
-    protected BaseAgent(
+    protected ReviewAgentBase(
         IKernelService kernelService,
         IGitHubService gitHubService,
         PullRequestDataService prDataService,
@@ -40,17 +44,17 @@ public abstract class BaseAgent
         }
     }
 
-    /// <summary>
-    /// Sets the language for AI responses dynamically
-    /// </summary>
-    protected void SetLanguage(string language)
-    {
-        Definition = Definition.WithLanguage(language);
-    }
-
     protected Kernel CreateKernel()
     {
         return KernelService.CreateKernel(Definition.SystemPrompt);
+    }
+
+    /// <summary>
+    /// Sets the language for AI responses dynamically
+    /// </summary>
+    public virtual void SetLanguage(string language)
+    {
+        Definition = Definition.WithLanguage(language);
     }
 
     protected async Task<(PullRequest pr, IReadOnlyList<PullRequestFile> files, string diff)> GetPRDataAsync(
@@ -58,4 +62,5 @@ public abstract class BaseAgent
     {
         return await PRDataService.GetPullRequestDataAsync(owner, repo, prNumber);
     }
-}
+
+    }

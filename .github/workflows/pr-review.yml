@@ -26,19 +26,21 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: false
 
       - name: Build PRAgent
         run: dotnet build PRAgent/PRAgent.csproj -c Release
 
       - name: Run PRAgent Review
-        run: dotnet run --project PRAgent/PRAgent.csproj --configuration Release --no-build -- \
-          review \
-          --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
-          --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
-          --pr "${{ github.event.pull_request.number }}" \
-          --post-comment
+        run: |
+          dotnet PRAgent/bin/Release/net10.0/PRAgent.dll \
+            review \
+            --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
+            --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --post-comment
         env:
-          AI_ENDPOINT: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
-          AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_MODEL_ID: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AISettings__Endpoint: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
+          AISettings__ApiKey: ${{ secrets.AI_API_KEY }}
+          AISettings__ModelId: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
+          PRSettings__GitHubToken: ${{ secrets.GITHUB_TOKEN }}

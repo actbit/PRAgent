@@ -13,6 +13,15 @@ public interface IAgentOrchestratorService
         int prNumber,
         ApprovalThreshold threshold,
         CancellationToken cancellationToken = default);
+    Task<string> ReviewAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default);
+    Task<string> SummarizeAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default);
+    Task<ApprovalResult> ReviewAndApproveAsync(
+        string owner,
+        string repo,
+        int prNumber,
+        ApprovalThreshold threshold,
+        string language,
+        CancellationToken cancellationToken = default);
 }
 
 public class ApprovalResult
