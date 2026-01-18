@@ -38,9 +38,11 @@ jobs:
             --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
             --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
             --pr "${{ github.event.pull_request.number }}" \
-            --post-comment
+            --post-comment \
+            --language ja
         env:
           AISettings__Endpoint: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
           AISettings__ApiKey: ${{ secrets.AI_API_KEY }}
           AISettings__ModelId: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
+          AISettings__Language: ja
           PRSettings__GitHubToken: ${{ secrets.GITHUB_TOKEN }}
