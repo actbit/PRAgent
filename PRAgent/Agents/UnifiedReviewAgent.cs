@@ -223,15 +223,16 @@ public class UnifiedReviewAgent
         {
             if (string.IsNullOrWhiteSpace(result))
             {
+                _logger.LogWarning("Tool result is empty or whitespace for type {TypeName}", typeof(T).Name);
                 return new T();
             }
 
             // JSONとしてパースを試みる
             return JsonSerializer.Deserialize<T>(result) ?? new T();
         }
-        catch
+        catch (Exception ex)
         {
-            // パースに失敗した場合はデフォルト値を返す
+            _logger.LogError(ex, "Failed to parse tool result for type {TypeName}. Result: {Result}", typeof(T).Name, result);
             return new T();
         }
     }
@@ -302,17 +303,31 @@ public class UnifiedReviewAgent
             {
                 try
                 {
+                    if (string.IsNullOrEmpty(comment.Path))
+                    {
+                        _logger.LogWarning("Comment has empty file path. Skipping comment: {Body}", comment.Body);
+                        continue;
+                    }
+
+                    if (!comment.Position.HasValue || comment.Position.Value <= 0)
+                    {
+                        _logger.LogWarning("Comment for file {FilePath} has invalid position: {Position}. Skipping comment.", comment.Path, comment.Position ?? 0);
+                        continue;
+                    }
+
                     await gitHubService.CreatePullRequestCommentAsync(
                         owner,
                         repo,
                         prNumber,
                         comment.Path,
-                        comment.Position ?? 0,
+                        comment.Position.Value,
                         comment.Body);
+
+                    _logger.LogInformation("Comment posted successfully for file {FilePath} at line {Position}", comment.Path, comment.Position.Value);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to create comment for file {FilePath}", comment.Path);
+                    _logger.LogError(ex, "Failed to create comment for file {FilePath} at position {Position}", comment.Path, comment.Position ?? 0);
                 }
             }
 
