@@ -42,6 +42,7 @@ public class ReviewAnalysisTools
 
     /// <summary>
     /// レビュー内容から問題点を抽出するTool
+    /// レビュー内容を解析して、ファイルごとの問題点を構造化された形式で抽出します
     /// </summary>
     [KernelFunction("ExtractReviewIssues")]
     public async Task<ReviewAnalysisResult> ExtractReviewIssuesAsync(
@@ -71,6 +72,7 @@ public class ReviewAnalysisTools
 
     /// <summary>
     /// 問題点からGitHubレビューコメントを生成するTool
+    /// 抽出された問題点から、GitHubプルリクエスト用の適切なレビューコメントを生成します
     /// </summary>
     [KernelFunction("GenerateReviewComments")]
     public async Task<List<PRAgent.ReviewModels.DraftPullRequestReviewComment>> GenerateReviewCommentsAsync(
