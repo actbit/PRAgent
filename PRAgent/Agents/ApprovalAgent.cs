@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using PRAgent.Models;
 using PRAgent.Services;
@@ -6,14 +7,18 @@ namespace PRAgent.Agents;
 
 public class ApprovalAgent : BaseAgent
 {
+    private readonly ILogger<ApprovalAgent> _logger;
+
     public ApprovalAgent(
         IKernelService kernelService,
         IGitHubService gitHubService,
         PullRequestDataService prDataService,
         AISettings aiSettings,
+        ILogger<ApprovalAgent> logger,
         string? customSystemPrompt = null)
         : base(kernelService, gitHubService, prDataService, aiSettings, AgentDefinition.ApprovalAgent, customSystemPrompt)
     {
+        _logger = logger;
     }
 
     public new void SetLanguage(string language) => base.SetLanguage(language);
@@ -26,6 +31,7 @@ public class ApprovalAgent : BaseAgent
         ApprovalThreshold threshold,
         CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Language: {Language}", AISettings.Language);
         var pr = await GitHubService.GetPullRequestAsync(owner, repo, prNumber);
         var thresholdDescription = ApprovalThresholdHelper.GetDescription(threshold);
 

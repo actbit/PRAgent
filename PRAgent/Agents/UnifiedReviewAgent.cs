@@ -37,6 +37,7 @@ public class UnifiedReviewAgent : ReviewAgentBase
         int prNumber,
         CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Language: {Language}", AISettings.Language);
         SetLanguage(AISettings.Language);
 
         // 1. PRデータ取得とプロンプット作成

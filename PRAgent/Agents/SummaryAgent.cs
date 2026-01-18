@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using PRAgent.Models;
 using PRAgent.Services;
@@ -6,14 +7,18 @@ namespace PRAgent.Agents;
 
 public class SummaryAgent : BaseAgent
 {
+    private readonly ILogger<SummaryAgent> _logger;
+
     public SummaryAgent(
         IKernelService kernelService,
         IGitHubService gitHubService,
         PullRequestDataService prDataService,
         AISettings aiSettings,
+        ILogger<SummaryAgent> logger,
         string? customSystemPrompt = null)
         : base(kernelService, gitHubService, prDataService, aiSettings, AgentDefinition.SummaryAgent, customSystemPrompt)
     {
+        _logger = logger;
     }
 
     public new void SetLanguage(string language) => base.SetLanguage(language);
@@ -24,6 +29,7 @@ public class SummaryAgent : BaseAgent
         int prNumber,
         CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Language: {Language}", AISettings.Language);
         var (pr, files, diff) = await GetPRDataAsync(owner, repo, prNumber);
         var fileList = PullRequestDataService.FormatFileList(files);
 

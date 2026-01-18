@@ -33,6 +33,7 @@ public class ReviewAgent : ReviewAgentBase
         int prNumber,
         CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Language: {Language}", AISettings.Language);
         var (pr, files, diff) = await GetPRDataAsync(owner, repo, prNumber);
         var fileList = PullRequestDataService.FormatFileList(files);
 

@@ -65,6 +65,9 @@ public static class ServiceCollectionExtensions
         // Data Services
         services.AddSingleton<PullRequestDataService>();
 
+        // Analysis Tools
+        services.AddSingleton<ReviewAnalysisTools>();
+
         // Agents
         services.AddSingleton<ApprovalAgent>();
         services.AddSingleton<SummaryAgent>();
