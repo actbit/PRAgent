@@ -118,10 +118,20 @@ public class PRAnalysisService : IPRAnalysisService
             ? await _agentOrchestrator.ReviewAndApproveAsync(owner, repo, prNumber, threshold, language)
             : await _agentOrchestrator.ReviewAndApproveAsync(owner, repo, prNumber, threshold);
 
-        if (postComment && !result.Approved)
+        if (postComment)
         {
-            await _gitHubService.CreateIssueCommentAsync(owner, repo, prNumber,
-                $"## 🤖 PRAgent Approval Decision\n\n**Decision:** Not Approved\n\n**Reasoning:** {result.Reasoning}\n\n---\n\n{result.Review}");
+            if (result.Approved)
+            {
+                // Approvedの場合もコメントを投稿
+                await _gitHubService.CreateIssueCommentAsync(owner, repo, prNumber,
+                    $"## 🤖 PRAgent Approval Decision\n\n**Decision:** Approved\n\n**Reasoning:** {result.Reasoning}\n\n---\n\n{result.Review}");
+            }
+            else
+            {
+                // Not Approvedの場合
+                await _gitHubService.CreateIssueCommentAsync(owner, repo, prNumber,
+                    $"## 🤖 PRAgent Approval Decision\n\n**Decision:** Not Approved\n\n**Reasoning:** {result.Reasoning}\n\n---\n\n{result.Review}");
+            }
         }
 
         return result;

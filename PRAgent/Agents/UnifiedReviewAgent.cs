@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Agents;
 using Octokit;
 using PRAgent.Models;
 using PRAgent.ReviewModels;
 using PRAgent.Services;
+using System.Text.Json;
 
 namespace PRAgent.Agents;
 
@@ -34,9 +34,6 @@ public class UnifiedReviewAgent
         _logger = logger;
         _serviceProvider = serviceProvider;
         _aiSettings = aiSettings;
-
-        // Subagentを作成
-        _logger.LogInformation("Creating subagents for unified review");
 
         // Loggerの型変換ができない場合は新しいLoggerインスタンスを作成
         var reviewAnalysisLogger = logger as ILogger<ReviewAnalysisAgent>;
@@ -98,22 +95,43 @@ public class UnifiedReviewAgent
 
             _logger.LogInformation("=== UnifiedReviewAgent Review Response ===\n{Response}", reviewContent);
 
-            // 4. Subagentを使用して問題点抽出
-            _logger.LogInformation("=== Using ReviewAnalysisAgent ===");
+            // 4. Subagentを使用して問題点抽出 - toolを自動で呼び出す
+            _logger.LogInformation("=== Using ReviewAnalysisAgent with Auto Tool Invocation ===");
             var reviewAnalysisKernel = _reviewAnalysisAgent.GetKernel();
+
+            // System Promptを設定
+            var reviewSystemPrompt = $"あなたは専門のコードレビューアです。以下のレビュー結果から構造化された問題点を抽出してください。言語：{_aiSettings.Language}";
+            reviewAnalysisKernel.ImportPluginFromFunctions("ReviewAnalysis", [
+                KernelFunctionFactory.CreateFromMethod(_reviewAnalysisAgent.GetTools().ExtractReviewIssuesAsync, "ExtractReviewIssues"),
+                KernelFunctionFactory.CreateFromMethod(_reviewAnalysisAgent.GetTools().GenerateReviewCommentsAsync, "GenerateReviewComments"),
+                KernelFunctionFactory.CreateFromMethod(_reviewAnalysisAgent.GetTools().ReadFileContentAsync, "ReadFileContent")
+            ]);
+
+            // プロンプト実行
+            var reviewPromptWithSystem = $"{reviewSystemPrompt}\n\n{reviewPrompt}";
             var analysisResult = await reviewAnalysisKernel.InvokeAsync<ReviewAnalysisResult>(
                 "ReviewAnalysis", "ExtractReviewIssues",
                 new KernelArguments
                 {
-                    ["reviewContent"] = reviewContent,
+                    ["reviewContent"] = reviewPromptWithSystem,
                     ["language"] = _aiSettings.Language
                 });
 
             _logger.LogInformation("=== Extracted {Count} Issues ===", analysisResult.Issues.Count);
 
-            // 5. Subagentを使用してコメント生成
-            _logger.LogInformation("=== Using CommentCreationAgent ===");
+            // 5. Subagentを使用してコメント生成 - toolを自動で呼び出す
+            _logger.LogInformation("=== Using CommentCreationAgent with Auto Tool Invocation ===");
             var commentCreationKernel = _commentCreationAgent.GetKernel();
+
+            // System Promptを設定
+            var commentSystemPrompt = $"あなたはGitHubのコメント生成エージェントです。抽出された問題点から、適切なGitHubプルリクエストコメントを作成してください。言語：{_aiSettings.Language}";
+            commentCreationKernel.ImportPluginFromFunctions("CommentCreation", [
+                KernelFunctionFactory.CreateFromMethod(_commentCreationAgent.GetTools().GenerateReviewCommentsAsync, "GenerateReviewComments"),
+                KernelFunctionFactory.CreateFromMethod(_commentCreationAgent.GetTools().ReadFileContentAsync, "ReadFileContent")
+            ]);
+
+            // プロンプト実行
+            var commentPrompt = $"{commentSystemPrompt}\n\n抽出された問題点:\n{JsonSerializer.Serialize(analysisResult)}";
             var comments = await commentCreationKernel.InvokeAsync<List<PRAgent.ReviewModels.DraftPullRequestReviewComment>>(
                 "CommentCreation", "GenerateReviewComments",
                 new KernelArguments
@@ -152,7 +170,6 @@ public class UnifiedReviewAgent
         return (files, diff);
     }
 
-    
     private string CreateReviewPrompt(PullRequest pr, string fileList, string diff)
     {
         return $"""
@@ -194,7 +211,7 @@ public class UnifiedReviewAgent
             """;
     }
 
-    private async Task PostReviewWithComments(string owner, string repo, int prNumber, string review, string reviewContent, List<ReviewModels.DraftPullRequestReviewComment> comments)
+    private async Task PostReviewWithComments(string owner, string repo, int prNumber, string review, string reviewContent, List<PRAgent.ReviewModels.DraftPullRequestReviewComment> comments)
     {
         try
         {
@@ -203,16 +220,38 @@ public class UnifiedReviewAgent
             // GitHub APIでレビューを投稿
             var gitHubService = _serviceProvider.GetRequiredService<IGitHubService>();
 
-            // レビューはGitHubに直接投稿せず、結果を返す
-            // 実際のGitHub投稿は呼び出し側で行う
+            // コメントを個別に投稿
+            foreach (var comment in comments)
+            {
+                try
+                {
+                    await gitHubService.CreatePullRequestCommentAsync(
+                        owner,
+                        repo,
+                        prNumber,
+                        comment.Path,
+                        comment.Position ?? 0,
+                        comment.Body);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to create comment for file {FilePath}", comment.Path);
+                }
+            }
 
-            _logger.LogInformation("Review and comments generated successfully");
+            _logger.LogInformation("Review and comments posted successfully to GitHub");
             _logger.LogInformation("Review length: {Length} characters", reviewContent.Length);
             _logger.LogInformation("Comments count: {Count}", comments.Count);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to post review to GitHub");
+
+            // エラーの場合はIssueCommentとして投稿
+            var gitHubService2 = _serviceProvider.GetRequiredService<IGitHubService>();
+            await gitHubService2.CreateIssueCommentAsync(owner, repo, prNumber,
+                $"## 🤖 PRAgent Review (Fallback)\n\n{review}\n\n*Note: Failed to post as review comments, posted as issue comment instead.*");
+
             throw;
         }
     }

@@ -15,8 +15,9 @@ public interface IGitHubService
         int prNumber,
         string commitId,
         string body,
-        IEnumerable<DraftPullRequestReviewComment> comments);
+        IEnumerable<Octokit.DraftPullRequestReviewComment> comments);
     Task<IssueComment> CreateIssueCommentAsync(string owner, string repo, int prNumber, string body);
+    Task<PullRequestReviewComment> CreatePullRequestCommentAsync(string owner, string repo, int prNumber, string path, int position, string body);
     Task<PullRequestReview> ApprovePullRequestAsync(string owner, string repo, int prNumber, string? comment = null);
     Task<string?> GetRepositoryFileContentAsync(string owner, string repo, string path, string? branch = null);
     Task<bool> FileExistsAsync(string owner, string repo, string path, string? branch = null);

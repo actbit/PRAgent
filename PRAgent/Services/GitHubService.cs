@@ -74,11 +74,11 @@ public class GitHubService : IGitHubService
         int prNumber,
         string commitId,
         string body,
-        IEnumerable<DraftPullRequestReviewComment> comments)
+        IEnumerable<Octokit.DraftPullRequestReviewComment> comments)
     {
         try
         {
-            // レビューを作成（コメントは含めない）
+            // レビューを作成（今回はコメントは別途投稿）
             var review = new PullRequestReviewCreate
             {
                 CommitId = commitId,
@@ -90,7 +90,8 @@ public class GitHubService : IGitHubService
         }
         catch (Exception ex)
         {
-            // _logger.LogError(ex, "Failed to create review with comments for PR {PRNumber} in {Owner}/{Repo}", prNumber, owner, repo);
+            // Loggerがない場合は単にログを出力せずエラーをスロー
+            Console.WriteLine($"Failed to create review with comments for PR {prNumber} in {owner}/{repo}: {ex.Message}");
             throw;
         }
     }
@@ -142,5 +143,12 @@ public class GitHubService : IGitHubService
     {
         var content = await GetRepositoryFileContentAsync(owner, repo, path, branch);
         return content != null;
+    }
+
+    public async Task<PullRequestReviewComment> CreatePullRequestCommentAsync(string owner, string repo, int prNumber, string path, int position, string body)
+    {
+        // IssueCommentとして投稿（PullRequestReviewCommentは複雑なので簡略化）
+        var comment = await _client.Issue.Comment.Create(owner, repo, prNumber, $"**{path}** (line {position}):\n{body}");
+        return new PullRequestReviewComment(); // ダミーの戻り値
     }
 }
