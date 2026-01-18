@@ -10,11 +10,13 @@ public class ReviewCommandHandler : ICommandHandler
 {
     private readonly ReviewOptions _options;
     private readonly IPRAnalysisService _prAnalysisService;
+    private readonly IServiceProvider _serviceProvider;
 
-    public ReviewCommandHandler(ReviewOptions options, IPRAnalysisService prAnalysisService)
+    public ReviewCommandHandler(ReviewOptions options, IPRAnalysisService prAnalysisService, IServiceProvider serviceProvider)
     {
         _options = options;
         _prAnalysisService = prAnalysisService;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<int> ExecuteAsync()

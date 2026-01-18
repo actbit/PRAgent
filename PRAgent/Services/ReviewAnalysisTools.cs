@@ -15,6 +15,7 @@ public class ReviewAnalysisTools
     private readonly IGitHubService _gitHubService;
     private readonly PullRequestDataService _prDataService;
     private readonly ILogger<ReviewAnalysisTools> _logger;
+    private string _language = "ja";
 
     public ReviewAnalysisTools(
         IGitHubService gitHubService,
@@ -26,6 +27,18 @@ public class ReviewAnalysisTools
         _logger = logger;
     }
 
+    public void SetLanguage(string language)
+    {
+        _language = language.ToLowerInvariant() switch
+        {
+            "ja" => "ja",
+            "en" => "en",
+            _ => "ja" // デフォルトは日本語
+        };
+
+        _logger.LogInformation("Language set to: {Language}", _language);
+    }
+
     /// <summary>
     /// レビュー内容から問題点を抽出するTool
     /// </summary>
@@ -35,11 +48,12 @@ public class ReviewAnalysisTools
         string language = "ja")
     {
         _logger.LogInformation("=== ExtractReviewIssues Called ===");
+        SetLanguage(language);
 
         try
         {
             // レビュー内容を解析して問題点を抽出
-            var issues = ParseReviewContent(reviewContent, language);
+            var issues = ParseReviewContent(reviewContent, _language);
 
             return new ReviewAnalysisResult
             {
@@ -63,6 +77,7 @@ public class ReviewAnalysisTools
         string language = "ja")
     {
         _logger.LogInformation("=== GenerateReviewComments Called ===");
+        SetLanguage(language);
 
         var comments = new List<DraftPullRequestReviewComment>();
 
@@ -70,7 +85,7 @@ public class ReviewAnalysisTools
         {
             try
             {
-                var comment = await GenerateCommentForIssueAsync(issue, language);
+                var comment = await GenerateCommentForIssueAsync(issue, _language);
                 if (comment != null)
                 {
                     comments.Add(comment);

@@ -65,15 +65,20 @@ public static class ServiceCollectionExtensions
         // Data Services
         services.AddSingleton<PullRequestDataService>();
 
-        // Analysis Tools
-        services.AddScoped<ReviewAnalysisTools>();
-
+        
         // Agents
         services.AddSingleton<ApprovalAgent>();
         services.AddSingleton<SummaryAgent>();
         services.AddSingleton<UnifiedReviewAgent>();
         services.AddSingleton<ReviewAgent>(); // 後方互換性のため残す
         services.AddSingleton<IDetailedCommentAgent, DetailedCommentAgent>();
+
+        // Subagents
+        services.AddSingleton<ReviewAnalysisAgent>();
+        services.AddSingleton<CommentCreationAgent>();
+
+        // Scoped services for Semantic Kernel plugins
+        services.AddScoped<ReviewAnalysisTools>();
 
         // Agent Orchestrator
         services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();

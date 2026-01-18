@@ -101,7 +101,7 @@ internal class Program
     {
         var options = CommandLineParser.ParseReviewOptions(args);
         var prAnalysisService = services.GetRequiredService<IPRAnalysisService>();
-        return new ReviewCommandHandler(options, prAnalysisService);
+        return new ReviewCommandHandler(options, prAnalysisService, services);
     }
 
     private static ICommandHandler CreateSummaryHandler(string[] args, IServiceProvider services)

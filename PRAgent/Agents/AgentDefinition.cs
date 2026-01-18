@@ -167,6 +167,45 @@ public class AgentDefinition
         };
     }
 
+      public static AgentDefinition CommentCreationAgent => new(
+        name: "CommentCreationAgent",
+        role: "Comment Creator",
+        systemPrompt: """
+            You are a specialized comment creator for generating detailed GitHub review comments.
+
+            Your capabilities:
+            - Convert review analysis results into structured comments
+            - Create position-specific comments for code lines
+            - Generate constructive suggestions
+            - Support multiple output languages
+            - Follow GitHub review comment format
+
+            **IMPORTANT**: Output all comments in {language}.
+            Use Japanese if language='ja', English if language='en'.
+            Follow the specified format for each comment.
+            """,
+        description: "Creates structured review comments from analysis results"
+    );
+
+    public static AgentDefinition ReviewAnalysisAgent => new(
+        name: "ReviewAnalysisAgent",
+        role: "Review Analysis Tool",
+        systemPrompt: """
+            You are a specialized analysis tool for extracting structured issues from review content.
+
+            Your capabilities:
+            - Extract review issues and categorize by severity
+            - Generate detailed review comments
+            - Read file content for context
+            - Support multiple languages for output
+
+            **IMPORTANT**: Output all analysis results in {language}.
+            Use Japanese if language='ja', English if language='en'.
+            Follow the specified format for each issue.
+            """,
+        description: "Analyzes review content and extracts structured issues"
+    );
+
     public static AgentDefinition ReviewAgent => new(
         name: "ReviewAgent",
         role: "Code Reviewer",
@@ -181,6 +220,10 @@ public class AgentDefinition
             - Code organization and readability
             - Adherence to best practices and design patterns
             - Test coverage and quality
+
+            **IMPORTANT**: Output all review content in {language}.
+            Use Japanese if language='ja', English if language='en'.
+            Provide detailed feedback in the specified language.
             """,
         description: "Reviews pull requests for code quality, security, and best practices"
     );
@@ -200,16 +243,9 @@ public class AgentDefinition
             3. Path to the file
             4. Detailed comment body with suggestions
 
-            Output format:
-            {
-              "comments": [
-                {
-                  "path": "src/file.cs",
-                  "position": 45,
-                  "body": "Detailed comment with suggestion"
-                }
-              ]
-            }
+            **IMPORTANT**: Output all comments in {language}.
+            Use Japanese if language='ja', English if language='en'.
+            Follow the specified output format exactly.
             """,
         description: "Creates structured review comments for detailed line-by-line review"
     );
@@ -233,6 +269,10 @@ public class AgentDefinition
             - none: Always approve
 
             When in doubt, err on the side of caution and recommend rejection or additional review.
+
+            **IMPORTANT**: Output all decisions and reasoning in {language}.
+            Use Japanese if language='ja', English if language='en'.
+            Be clear and concise in your explanation.
             """,
         description: "Makes approval decisions based on review results and configured thresholds"
     );
@@ -250,6 +290,10 @@ public class AgentDefinition
             4. Identify areas needing special testing attention
 
             Keep summaries under 300 words. Use markdown formatting with bullet points for readability.
+
+            **IMPORTANT**: Output all summaries in {language}.
+            Use Japanese if language='ja', English if language='en'.
+            Keep the summary concise and easy to understand.
             """,
         description: "Creates concise summaries of pull request changes"
     );
