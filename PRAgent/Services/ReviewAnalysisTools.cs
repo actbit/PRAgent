@@ -3,6 +3,7 @@ using Microsoft.SemanticKernel;
 using Octokit;
 using PRAgent.Agents;
 using PRAgent.Models;
+using PRAgent.ReviewModels;
 using PRAgent.Services;
 
 namespace PRAgent.Services;
@@ -72,14 +73,14 @@ public class ReviewAnalysisTools
     /// 問題点からGitHubレビューコメントを生成するTool
     /// </summary>
     [KernelFunction("GenerateReviewComments")]
-    public async Task<List<DraftPullRequestReviewComment>> GenerateReviewCommentsAsync(
+    public async Task<List<PRAgent.ReviewModels.DraftPullRequestReviewComment>> GenerateReviewCommentsAsync(
         ReviewAnalysisResult analysis,
         string language = "ja")
     {
         _logger.LogInformation("=== GenerateReviewComments Called ===");
         SetLanguage(language);
 
-        var comments = new List<DraftPullRequestReviewComment>();
+        var comments = new List<PRAgent.ReviewModels.DraftPullRequestReviewComment>();
 
         foreach (var issue in analysis.Issues)
         {
@@ -96,7 +97,7 @@ public class ReviewAnalysisTools
                 _logger.LogError(ex, "Failed to generate comment for issue: {Title}", issue.Title);
 
                 // フォールバックコメント
-                var fallbackComment = new DraftPullRequestReviewComment(
+                var fallbackComment = new PRAgent.ReviewModels.DraftPullRequestReviewComment(
                     issue.FilePath,
                     $"{issue.Level}: {issue.Description}\n\n{issue.Suggestion}",
                     issue.StartLine);
@@ -147,9 +148,9 @@ public class ReviewAnalysisTools
     /// <summary>
     /// レビュー内容のパーサー
     /// </summary>
-    private List<ReviewIssue> ParseReviewContent(string reviewContent, string language)
+    private List<PRAgent.ReviewModels.ReviewIssue> ParseReviewContent(string reviewContent, string language)
     {
-        var issues = new List<ReviewIssue>();
+        var issues = new List<PRAgent.ReviewModels.ReviewIssue>();
 
         // セクションごとに分割
         var sections = reviewContent.Split(new[] { "\n\n### ", "\n## ", "\n##\n\n" }, StringSplitOptions.RemoveEmptyEntries);
@@ -163,14 +164,14 @@ public class ReviewAnalysisTools
                 var levelStr = titleMatch.Groups[2].Value;
                 var title = titleMatch.Groups[3].Value.Trim();
 
-                // レベルを判定
+                // レベルを判定 - string型に変換
                 var level = levelStr switch
                 {
-                    "CRITICAL" => Severity.Critical,
-                    "MAJOR" => Severity.Major,
-                    "MINOR" => Severity.Minor,
-                    "POSITIVE" => Severity.Positive,
-                    _ => Severity.Major
+                    "CRITICAL" => "CRITICAL",
+                    "MAJOR" => "MAJOR",
+                    "MINOR" => "MINOR",
+                    "POSITIVE" => "POSITIVE",
+                    _ => "MAJOR"
                 };
 
                 // ファイルパスを抽出
@@ -203,7 +204,7 @@ public class ReviewAnalysisTools
                     suggestion = suggestionMatch.Groups[1].Value.Trim();
                 }
 
-                issues.Add(new ReviewIssue
+                issues.Add(new PRAgent.ReviewModels.ReviewIssue
                 {
                     Title = title,
                     Level = level,
@@ -222,7 +223,7 @@ public class ReviewAnalysisTools
     /// <summary>
     /// 各問題からGitHubコメントを生成
     /// </summary>
-    private async Task<DraftPullRequestReviewComment?> GenerateCommentForIssueAsync(ReviewIssue issue, string language)
+    private async Task<PRAgent.ReviewModels.DraftPullRequestReviewComment?> GenerateCommentForIssueAsync(PRAgent.ReviewModels.ReviewIssue issue, string language)
     {
         var prompt = CreateCommentPrompt(issue, language);
 
@@ -230,13 +231,13 @@ public class ReviewAnalysisTools
         // ここでは簡略化して直接返す
         var commentText = await GenerateCommentText(issue, language);
 
-        return new DraftPullRequestReviewComment(issue.FilePath, commentText, issue.StartLine);
+        return new PRAgent.ReviewModels.DraftPullRequestReviewComment(issue.FilePath, commentText, issue.StartLine);
     }
 
     /// <summary>
     /// コメント生成用のプロンプト
     /// </summary>
-    private string CreateCommentPrompt(ReviewIssue issue, string language)
+    private string CreateCommentPrompt(PRAgent.ReviewModels.ReviewIssue issue, string language)
     {
         return $$"""
             Create a detailed GitHub pull request review comment for this issue:
@@ -260,7 +261,7 @@ public class ReviewAnalysisTools
     /// <summary>
     /// コメントテキストを生成（実際の実装ではAI呼び出し）
     /// </summary>
-    private Task<string> GenerateCommentText(ReviewIssue issue, string language)
+    private Task<string> GenerateCommentText(PRAgent.ReviewModels.ReviewIssue issue, string language)
     {
         return Task.FromResult(
             $"{issue.Level}: {issue.Description}\n\n{issue.Suggestion}"
@@ -270,22 +271,14 @@ public class ReviewAnalysisTools
     /// <summary>
     /// レビュー要約を作成
     /// </summary>
-    private string CreateReviewSummary(List<ReviewIssue> issues)
+    private string CreateReviewSummary(List<PRAgent.ReviewModels.ReviewIssue> issues)
     {
-        var criticalCount = issues.Count(i => i.Level == Severity.Critical);
-        var majorCount = issues.Count(i => i.Level == Severity.Major);
-        var minorCount = issues.Count(i => i.Level == Severity.Minor);
-        var positiveCount = issues.Count(i => i.Level == Severity.Positive);
+        var criticalCount = issues.Count(i => i.Level == "CRITICAL");
+        var majorCount = issues.Count(i => i.Level == "MAJOR");
+        var minorCount = issues.Count(i => i.Level == "MINOR");
+        var positiveCount = issues.Count(i => i.Level == "POSITIVE");
 
         return $"Issues found: {issues.Count} (Critical: {criticalCount}, Major: {majorCount}, Minor: {minorCount}, Positive: {positiveCount})";
     }
 }
 
-/// <summary>
-/// レビュー分析結果
-/// </summary>
-public class ReviewAnalysisResult
-{
-    public List<ReviewIssue> Issues { get; set; } = new List<ReviewIssue>();
-    public string ReviewSummary { get; set; } = string.Empty;
-}

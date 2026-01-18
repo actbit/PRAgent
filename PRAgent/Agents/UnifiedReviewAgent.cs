@@ -101,7 +101,7 @@ public class UnifiedReviewAgent
             // 4. Subagentを使用して問題点抽出
             _logger.LogInformation("=== Using ReviewAnalysisAgent ===");
             var reviewAnalysisKernel = _reviewAnalysisAgent.GetKernel();
-            var analysisResult = await reviewAnalysisKernel.InvokeAsync<PRAgent.ReviewModels.ReviewAnalysisResult>(
+            var analysisResult = await reviewAnalysisKernel.InvokeAsync<ReviewAnalysisResult>(
                 "ReviewAnalysis", "ExtractReviewIssues",
                 new KernelArguments
                 {
