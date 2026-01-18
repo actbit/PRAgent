@@ -104,8 +104,8 @@ public class DetailedCommentAgent : ReviewAgentBase, IDetailedCommentAgent
                 }
 
                 // 問題説明を抽出
-                var problemSection = System.Text.RegularExpressions.Regex.Split(section, @"\n\*\*\w+:\*\*")[1];
-                var problem = problemSection.Split('\n')[0].Trim();
+                var problemSection = System.Text.RegularExpressions.Regex.Split(section, @"\n\*\*\w+:\*\*");
+                var problem = problemSection.Length > 1 ? problemSection[1].Split('\n')[0].Trim() : section.Split('\n')[0].Trim();
 
                 // 修正提案を抽出
                 var suggestion = "";
