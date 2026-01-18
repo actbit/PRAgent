@@ -70,6 +70,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SummaryAgent>();
         services.AddSingleton<UnifiedReviewAgent>();
         services.AddSingleton<ReviewAgent>(); // 後方互換性のため残す
+        services.AddSingleton<IDetailedCommentAgent, DetailedCommentAgent>();
 
         // Agent Orchestrator
         services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();
