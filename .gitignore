@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Development configuration files (contains sensitive information)
+PRAgent/appsettings.Development.json
+!PRAgent/appsettings.Development.Template.json
