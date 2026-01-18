@@ -9,4 +9,5 @@ public class AISettings
     public string ModelId { get; set; } = "gpt-4o-mini";
     public int MaxTokens { get; set; } = 4000;
     public double Temperature { get; set; } = 0.7;
+    public string Language { get; set; } = "en";  // Default: English
 }

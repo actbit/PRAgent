@@ -78,6 +78,33 @@ public class GitHubService : IGitHubService
         return await _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment);
     }
 
+    public async Task<PullRequestReview> CreateReviewWithCommentsAsync(string owner, string repo, int prNumber, string reviewBody, List<DraftPullRequestReviewComment> comments)
+    {
+        var reviewComment = new PullRequestReviewCreate()
+        {
+            Body = reviewBody,
+            Event = PullRequestReviewEvent.Comment,
+            Comments = comments
+        };
+
+        return await _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment);
+    }
+
+    /// <summary>
+    /// レビュー本文と詳細コメントをまとめて投稿
+    /// </summary>
+    public async Task CreateCompleteReviewAsync(string owner, string repo, int prNumber, string reviewBody, List<DraftPullRequestReviewComment> comments)
+    {
+        var review = new PullRequestReviewCreate()
+        {
+            Body = reviewBody,
+            Event = PullRequestReviewEvent.Comment,
+            Comments = comments
+        };
+
+        await _client.PullRequest.Review.Create(owner, repo, prNumber, review);
+    }
+
     public async Task<IssueComment> CreateIssueCommentAsync(string owner, string repo, int prNumber, string body)
     {
         return await _client.Issue.Comment.Create(owner, repo, prNumber, body);

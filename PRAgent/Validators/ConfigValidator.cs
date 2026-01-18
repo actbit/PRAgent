@@ -36,15 +36,17 @@ public static class ConfigValidator
 
     public static bool ValidatePRSettings(PRSettings settings, IList<string> errors)
     {
-        var isValid = true;
+        // GitHub Token can be provided via environment variable in GitHub Actions
+        // Skip validation if running in CI (check for GITHUB_ACTIONS env var)
+        var isGitHubActions = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"));
 
-        if (string.IsNullOrWhiteSpace(settings.GitHubToken))
+        if (!isGitHubActions && string.IsNullOrWhiteSpace(settings.GitHubToken))
         {
-            errors.Add("GitHub Token is required.");
-            isValid = false;
+            errors.Add("GitHub Token is required when not running in GitHub Actions.");
+            return false;
         }
 
-        return isValid;
+        return true;
     }
 
     public static bool ValidateApprovalThreshold(string threshold, IList<string> errors)
