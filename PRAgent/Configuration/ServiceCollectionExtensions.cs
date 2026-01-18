@@ -66,11 +66,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PullRequestDataService>();
 
         // Agents
-        services.AddSingleton<ReviewAgent>();
         services.AddSingleton<ApprovalAgent>();
         services.AddSingleton<SummaryAgent>();
-        services.AddSingleton<DetailedCommentAgent>();
-        services.AddSingleton<IDetailedCommentAgent, DetailedCommentAgent>();
+        services.AddSingleton<UnifiedReviewAgent>();
+        services.AddSingleton<ReviewAgent>(); // 後方互換性のため残す
 
         // Agent Orchestrator
         services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();

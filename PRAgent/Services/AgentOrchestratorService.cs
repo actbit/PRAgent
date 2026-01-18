@@ -6,31 +6,27 @@ namespace PRAgent.Services;
 
 public class AgentOrchestratorService : IAgentOrchestratorService
 {
-    private readonly ReviewAgent _reviewAgent;
+    private readonly UnifiedReviewAgent _unifiedReviewAgent;
+    private readonly ReviewAgent _reviewAgent; // 後方互換性のため
     private readonly ApprovalAgent _approvalAgent;
     private readonly SummaryAgent _summaryAgent;
-    private readonly DetailedCommentAgent _detailedCommentAgent;
     private readonly IGitHubService _gitHubService;
 
     public AgentOrchestratorService(
+        UnifiedReviewAgent unifiedReviewAgent,
         ReviewAgent reviewAgent,
         ApprovalAgent approvalAgent,
         SummaryAgent summaryAgent,
-        DetailedCommentAgent detailedCommentAgent,
         IGitHubService gitHubService)
     {
+        _unifiedReviewAgent = unifiedReviewAgent;
         _reviewAgent = reviewAgent;
         _approvalAgent = approvalAgent;
         _summaryAgent = summaryAgent;
-        _detailedCommentAgent = detailedCommentAgent;
         _gitHubService = gitHubService;
     }
 
-    public async Task<string> ReviewAsync(string owner, string repo, int prNumber, CancellationToken cancellationToken = default)
-    {
-        return await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken);
-    }
-
+  
     public async Task<string> SummarizeAsync(string owner, string repo, int prNumber, CancellationToken cancellationToken = default)
     {
         return await _summaryAgent.SummarizeAsync(owner, repo, prNumber, cancellationToken);
@@ -54,8 +50,8 @@ public class AgentOrchestratorService : IAgentOrchestratorService
         string? approvalUrl = null;
         if (shouldApprove)
         {
-            var result = await _approvalAgent.ApproveAsync(owner, repo, prNumber, comment);
-            approvalUrl = result;
+            var approvalResult = await _approvalAgent.ApproveAsync(owner, repo, prNumber, comment);
+            approvalUrl = approvalResult;
         }
 
         return new ApprovalResult
@@ -68,24 +64,20 @@ public class AgentOrchestratorService : IAgentOrchestratorService
         };
     }
 
+    public async Task<string> ReviewAsync(string owner, string repo, int prNumber, CancellationToken cancellationToken = default)
+    {
+        // 統合されたエージェントを使用
+        var result = await _unifiedReviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken);
+
+        return result.Review;
+    }
+
     public async Task<string> ReviewAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default)
     {
-        _reviewAgent.SetLanguage(language);
+        // 統合されたエージェントを使用
+        var result = await _unifiedReviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken);
 
-        var review = await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken);
-        var detailedComments = await _detailedCommentAgent.CreateCommentsAsync(review, language);
-
-        // レビューを投稿
-        await _gitHubService.CreateReviewCommentAsync(owner, repo, prNumber, review);
-
-        // 詳細コメントは個別に投稿（複数の場合はリクエスト制限に注意）
-        if (detailedComments.Count > 0)
-        {
-            // 最初のコメントを投稿（GitHub APIでは一度に複数コメントを投稿できる）
-            await _gitHubService.CreateReviewCommentAsync(owner, repo, prNumber, review);
-        }
-
-        return review;
+        return result.Review;
     }
 
     public async Task<string> SummarizeAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default)
@@ -102,21 +94,12 @@ public class AgentOrchestratorService : IAgentOrchestratorService
         string language,
         CancellationToken cancellationToken = default)
     {
-        _reviewAgent.SetLanguage(language);
+        _unifiedReviewAgent.SetLanguage(language);
         _approvalAgent.SetLanguage(language);
 
-        // Step 1: ReviewAgent performs the review
-        var review = await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken);
-        var detailedComments = await _detailedCommentAgent.CreateCommentsAsync(review, language);
-
-        // レビューを投稿
-        await _gitHubService.CreateReviewCommentAsync(owner, repo, prNumber, review);
-
-        // 詳細コメントは個別に投稿（複数の場合はリクエスト制限に注意）
-        if (detailedComments.Count > 0)
-        {
-            await _gitHubService.CreateReviewCommentAsync(owner, repo, prNumber, review);
-        }
+        // Step 1: UnifiedReviewAgent performs the review
+        var result = await _unifiedReviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken);
+        var review = result.Review;
 
         // Step 2: ApprovalAgent decides based on the review
         var (shouldApprove, reasoning, comment) = await _approvalAgent.DecideAsync(
@@ -126,8 +109,8 @@ public class AgentOrchestratorService : IAgentOrchestratorService
         string? approvalUrl = null;
         if (shouldApprove)
         {
-            var result = await _approvalAgent.ApproveAsync(owner, repo, prNumber, comment);
-            approvalUrl = result;
+            var approvalResult = await _approvalAgent.ApproveAsync(owner, repo, prNumber, comment);
+            approvalUrl = approvalResult;
         }
 
         return new ApprovalResult
