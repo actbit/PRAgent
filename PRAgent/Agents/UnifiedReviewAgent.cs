@@ -153,14 +153,18 @@ public class UnifiedReviewAgent : ReviewAgentBase
     {
         try
         {
-            // レビュー本文を投稿
-            await GitHubService.CreateReviewCommentAsync(owner, repo, prNumber, review);
+            // PRのHEADコミットIDを取得
+            var pr = await GitHubService.GetPullRequestAsync(owner, repo, prNumber);
+            var commitId = pr.Head.Sha;
 
-            // 詳細なコメントは個別に投稿（複数の場合はリクエスト制限に注意）
-            if (comments.Count > 0)
-            {
-                await GitHubService.CreateReviewCommentAsync(owner, repo, prNumber, review);
-            }
+            // レビューとコメントを一度に投稿
+            await GitHubService.CreateReviewWithCommentsAsync(
+                owner,
+                repo,
+                prNumber,
+                commitId,
+                review,
+                comments);
         }
         catch (Exception ex)
         {

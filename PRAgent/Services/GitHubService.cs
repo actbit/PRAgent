@@ -67,44 +67,35 @@ public class GitHubService : IGitHubService
         return diffBuilder.ToString();
     }
 
-    public async Task<PullRequestReview> CreateReviewCommentAsync(string owner, string repo, int prNumber, string body)
+    
+    public async Task<PullRequestReview> CreateReviewWithCommentsAsync(
+        string owner,
+        string repo,
+        int prNumber,
+        string commitId,
+        string body,
+        IEnumerable<DraftPullRequestReviewComment> comments)
     {
-        var reviewComment = new PullRequestReviewCreate()
+        try
         {
-            Body = body,
-            Event = PullRequestReviewEvent.Comment
-        };
+            // レビューを作成（コメントは含めない）
+            var review = new PullRequestReviewCreate
+            {
+                CommitId = commitId,
+                Event = PullRequestReviewEvent.Comment,
+                Body = body
+            };
 
-        return await _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment);
+            return await _client.PullRequest.Review.Create(owner, repo, prNumber, review);
+        }
+        catch (Exception ex)
+        {
+            // _logger.LogError(ex, "Failed to create review with comments for PR {PRNumber} in {Owner}/{Repo}", prNumber, owner, repo);
+            throw;
+        }
     }
 
-    public async Task<PullRequestReview> CreateReviewWithCommentsAsync(string owner, string repo, int prNumber, string reviewBody, List<DraftPullRequestReviewComment> comments)
-    {
-        var reviewComment = new PullRequestReviewCreate()
-        {
-            Body = reviewBody,
-            Event = PullRequestReviewEvent.Comment,
-            Comments = comments
-        };
-
-        return await _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment);
-    }
-
-    /// <summary>
-    /// レビュー本文と詳細コメントをまとめて投稿
-    /// </summary>
-    public async Task CreateCompleteReviewAsync(string owner, string repo, int prNumber, string reviewBody, List<DraftPullRequestReviewComment> comments)
-    {
-        var review = new PullRequestReviewCreate()
-        {
-            Body = reviewBody,
-            Event = PullRequestReviewEvent.Comment,
-            Comments = comments
-        };
-
-        await _client.PullRequest.Review.Create(owner, repo, prNumber, review);
-    }
-
+    
     public async Task<IssueComment> CreateIssueCommentAsync(string owner, string repo, int prNumber, string body)
     {
         return await _client.Issue.Comment.Create(owner, repo, prNumber, body);
