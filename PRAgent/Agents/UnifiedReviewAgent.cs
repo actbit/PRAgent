@@ -97,10 +97,11 @@ public class UnifiedReviewAgent
 
             // 4. Subagentを使用して問題点抽出 - toolを自動で呼び出す
             _logger.LogInformation("=== Using ReviewAnalysisAgent with Auto Tool Invocation ===");
-            var reviewAnalysisKernel = _reviewAnalysisAgent.GetKernel();
 
-            // System Promptを設定
-            var reviewSystemPrompt = $"あなたは専門のコードレビューアです。以下のレビュー結果から構造化された問題点を抽出してください。言語：{_aiSettings.Language}";
+            // 新しいKernelを作成
+            var reviewAnalysisKernel = _kernelService.CreateKernel();
+
+            // Pluginを登録
             reviewAnalysisKernel.ImportPluginFromFunctions("ReviewAnalysis", [
                 KernelFunctionFactory.CreateFromMethod(_reviewAnalysisAgent.GetTools().ExtractReviewIssuesAsync, "ExtractReviewIssues"),
                 KernelFunctionFactory.CreateFromMethod(_reviewAnalysisAgent.GetTools().GenerateReviewCommentsAsync, "GenerateReviewComments"),
@@ -108,7 +109,9 @@ public class UnifiedReviewAgent
             ]);
 
             // プロンプト実行
+            var reviewSystemPrompt = $"あなたは専門のコードレビューアです。以下のレビュー結果から構造化された問題点を抽出してください。言語：{_aiSettings.Language}";
             var reviewPromptWithSystem = $"{reviewSystemPrompt}\n\n{reviewPrompt}";
+
             var analysisResult = await reviewAnalysisKernel.InvokeAsync<ReviewAnalysisResult>(
                 "ReviewAnalysis", "ExtractReviewIssues",
                 new KernelArguments
@@ -121,17 +124,20 @@ public class UnifiedReviewAgent
 
             // 5. Subagentを使用してコメント生成 - toolを自動で呼び出す
             _logger.LogInformation("=== Using CommentCreationAgent with Auto Tool Invocation ===");
-            var commentCreationKernel = _commentCreationAgent.GetKernel();
 
-            // System Promptを設定
-            var commentSystemPrompt = $"あなたはGitHubのコメント生成エージェントです。抽出された問題点から、適切なGitHubプルリクエストコメントを作成してください。言語：{_aiSettings.Language}";
+            // 新しいKernelを作成
+            var commentCreationKernel = _kernelService.CreateKernel();
+
+            // Pluginを登録
             commentCreationKernel.ImportPluginFromFunctions("CommentCreation", [
                 KernelFunctionFactory.CreateFromMethod(_commentCreationAgent.GetTools().GenerateReviewCommentsAsync, "GenerateReviewComments"),
                 KernelFunctionFactory.CreateFromMethod(_commentCreationAgent.GetTools().ReadFileContentAsync, "ReadFileContent")
             ]);
 
             // プロンプト実行
+            var commentSystemPrompt = $"あなたはGitHubのコメント生成エージェントです。抽出された問題点から、適切なGitHubプルリクエストコメントを作成してください。言語：{_aiSettings.Language}";
             var commentPrompt = $"{commentSystemPrompt}\n\n抽出された問題点:\n{JsonSerializer.Serialize(analysisResult)}";
+
             var comments = await commentCreationKernel.InvokeAsync<List<PRAgent.ReviewModels.DraftPullRequestReviewComment>>(
                 "CommentCreation", "GenerateReviewComments",
                 new KernelArguments
