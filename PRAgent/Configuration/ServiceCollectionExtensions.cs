@@ -69,6 +69,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ReviewAgent>();
         services.AddSingleton<ApprovalAgent>();
         services.AddSingleton<SummaryAgent>();
+        services.AddSingleton<DetailedCommentAgent>();
+        services.AddSingleton<IDetailedCommentAgent, DetailedCommentAgent>();
 
         // Agent Orchestrator
         services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();

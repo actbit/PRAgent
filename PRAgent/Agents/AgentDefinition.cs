@@ -35,7 +35,7 @@ public class AgentDefinition
         {
             "ja" => """
                 **出力フォーマット:**
-                - 問題ごとに分けてコメントを作成してください
+                問題ごとに分けてコメントを作成してください
                 - 各問題には以下を含めてください：
                   * 影響を受けるファイル
                   * 行番号（該当する場合）
@@ -44,30 +44,24 @@ public class AgentDefinition
                   * 修正案（suggestion形式）
                   * 閎連ファイル（GitHubリンク）
 
-                **ラベル:**
-                - [CRITICAL] → [重要]
-                - [MAJOR] → [重大]
-                - [MINOR] → [軽微]
-                - [POSITIVE] → [良好]
-
-                **例:**
-                ### [重要] SQLインジェクションの脆弱性
-
-                **ファイル:** `src/Authentication.cs` (45行目)
+                **フォーマットの詳細:**
+                ```markdown
+                ### [重要] タイトル
 
                 **変更の有無:** ☑ あり
 
                 **問題:**
-                ユーザー入力が直接SQLクエリリに連結されています...
+                SQLインジェクションの脆弱性があります...
 
                 **修正案:**
                 ```suggestion
-                // パラメータ化クエリを使用してください
-                var query = "SELECT * FROM Users WHERE Id = @Id";
+                // 修正内容
+                ```
                 ```
 
                 **GitHub:**
                 `https://github.com/org/repo/pull/1/files#L45-L52`
+                ```
                 """,
             "en" => """
                 **Output Format:**
@@ -189,6 +183,35 @@ public class AgentDefinition
             - Test coverage and quality
             """,
         description: "Reviews pull requests for code quality, security, and best practices"
+    );
+
+    public static AgentDefinition DetailedCommentAgent => new(
+        name: "DetailedCommentAgent",
+        role: "Detailed Comment Creator",
+        systemPrompt: """
+            You are a detailed comment creator specialized in creating structured review comments.
+
+            Your task is to convert high-level review findings into detailed GitHub review comments
+            that can be attached to a PullRequestReview.Create call.
+
+            For each issue found in the review, create:
+            1. PullRequestReviewComment for the specific lines
+            2. Position of the comment (line number)
+            3. Path to the file
+            4. Detailed comment body with suggestions
+
+            Output format:
+            {
+              "comments": [
+                {
+                  "path": "src/file.cs",
+                  "position": 45,
+                  "body": "Detailed comment with suggestion"
+                }
+              ]
+            }
+            """,
+        description: "Creates structured review comments for detailed line-by-line review"
     );
 
     public static AgentDefinition ApprovalAgent => new(
