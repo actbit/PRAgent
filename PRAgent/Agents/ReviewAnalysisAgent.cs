@@ -23,7 +23,13 @@ public class ReviewAnalysisAgent
     {
         _logger = logger;
         var toolsLogger = logger as ILogger<ReviewAnalysisTools>;
-        _tools = new ReviewAnalysisTools(gitHubService, prDataService, toolsLogger ?? throw new ArgumentNullException(nameof(logger)));
+        if (toolsLogger == null)
+        {
+            _logger.LogWarning("Logger type mismatch, creating new logger instance");
+            toolsLogger = LoggerFactory.Create(builder => builder.AddConsole())
+                .CreateLogger<ReviewAnalysisTools>();
+        }
+        _tools = new ReviewAnalysisTools(gitHubService, prDataService, toolsLogger);
         _kernel = kernelService.CreateKernel();
 
         // ツールを登録

@@ -36,15 +36,32 @@ public class UnifiedReviewAgent
         _aiSettings = aiSettings;
 
         // Subagentを作成
+        _logger.LogInformation("Creating subagents for unified review");
+
+        // Loggerの型変換ができない場合は新しいLoggerインスタンスを作成
         var reviewAnalysisLogger = logger as ILogger<ReviewAnalysisAgent>;
+        if (reviewAnalysisLogger == null)
+        {
+            _logger.LogWarning("Logger type mismatch for ReviewAnalysisAgent, creating new instance");
+            reviewAnalysisLogger = LoggerFactory.Create(builder => builder.AddConsole())
+                .CreateLogger<ReviewAnalysisAgent>();
+        }
+
         _reviewAnalysisAgent = new ReviewAnalysisAgent(
-            kernelService, gitHubService, prDataService, aiSettings,
-            reviewAnalysisLogger ?? throw new ArgumentNullException(nameof(logger)));
+            kernelService, gitHubService, prDataService, aiSettings, reviewAnalysisLogger);
 
         var commentCreationLogger = logger as ILogger<CommentCreationAgent>;
+        if (commentCreationLogger == null)
+        {
+            _logger.LogWarning("Logger type mismatch for CommentCreationAgent, creating new instance");
+            commentCreationLogger = LoggerFactory.Create(builder => builder.AddConsole())
+                .CreateLogger<CommentCreationAgent>();
+        }
+
         _commentCreationAgent = new CommentCreationAgent(
-            kernelService, gitHubService, prDataService, aiSettings,
-            commentCreationLogger ?? throw new ArgumentNullException(nameof(logger)));
+            kernelService, gitHubService, prDataService, aiSettings, commentCreationLogger);
+
+        _logger.LogInformation("Subagents created successfully");
     }
 
     public void SetLanguage(string language)
