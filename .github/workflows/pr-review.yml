@@ -42,6 +42,6 @@ jobs:
             --post-comment
         env:
           AISettings__Endpoint: ${{ vars.AISETTINGS__ENDPOINT }}
-          AISettings__ApiKey: ${{ secrets.AI_API_KEY }}
-          AISettings__ModelId: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
+          AISettings__ApiKey: ${{ secrets.AISETTINGS__APIKEY }}
+          AISettings__ModelId: ${{ vars.AISETTINGS__MODELID || 'gpt-4o-mini' }}
           PRSettings__GitHubToken: ${{ secrets.GITHUB_TOKEN }}
