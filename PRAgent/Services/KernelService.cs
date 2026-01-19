@@ -29,6 +29,52 @@ public class KernelService : IKernelService
         return kernel;
     }
 
+    public Kernel CreateAgentKernel(string? systemPrompt = null)
+    {
+        var builder = Kernel.CreateBuilder();
+
+        builder.AddOpenAIChatCompletion(
+            modelId: _aiSettings.ModelId,
+            apiKey: _aiSettings.ApiKey,
+            endpoint: new Uri(_aiSettings.Endpoint)
+        );
+
+        var kernel = builder.Build();
+
+        // 注: SetDefaultSystemPromptは現在のバージョンではまだ利用できない
+        // 将来的には以下のようにsystemPromptを設定できるようになる予定
+        // if (!string.IsNullOrEmpty(systemPrompt))
+        // {
+        //     kernel.SetDefaultSystemPrompt(systemPrompt);
+        // }
+
+        return kernel;
+    }
+
+    public Kernel RegisterFunctionPlugins(Kernel kernel, IEnumerable<object> plugins)
+    {
+        foreach (var plugin in plugins)
+        {
+            kernel.ImportPluginFromObject(plugin);
+        }
+
+        return kernel;
+    }
+
+    public Kernel RegisterFunctionPlugin(Kernel kernel, object plugin, string? pluginName = null)
+    {
+        if (!string.IsNullOrEmpty(pluginName))
+        {
+            kernel.ImportPluginFromObject(plugin, pluginName);
+        }
+        else
+        {
+            kernel.ImportPluginFromObject(plugin);
+        }
+
+        return kernel;
+    }
+
     public async IAsyncEnumerable<string> InvokePromptAsync(
         Kernel kernel,
         string prompt,
