@@ -88,6 +88,7 @@ internal class Program
                     services.AddSingleton<PullRequestDataService>();
 
                     // Agents (現在稼働中)
+                    services.AddSingleton<IDetailedCommentAgent, DetailedCommentAgent>();
                     services.AddSingleton<ReviewAgent>();
                     services.AddSingleton<ApprovalAgent>();
                     services.AddSingleton<SummaryAgent>();
