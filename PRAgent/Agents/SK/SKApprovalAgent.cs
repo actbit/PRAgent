@@ -131,7 +131,8 @@ public class SKApprovalAgent
         string repo,
         int prNumber,
         PRActionBuffer buffer,
-        string? customSystemPrompt = null)
+        string? customSystemPrompt = null,
+        string? language = null)
     {
         // プラグインインスタンスを作成
         var approvePlugin = new ApprovePRFunction(buffer);
@@ -139,19 +140,101 @@ public class SKApprovalAgent
 
         // Kernelを作成してプラグインを登録
         var kernel = _agentFactory.CreateApprovalKernel(owner, repo, prNumber, customSystemPrompt);
-        kernel.ImportPluginFromObject(approvePlugin, "ApprovePR");
-        kernel.ImportPluginFromObject(commentPlugin, "PostComment");
+        kernel.ImportPluginFromObject(approvePlugin);
+        kernel.ImportPluginFromObject(commentPlugin);
+
+        // 言語に応じたシステムプロンプトを作成
+        var systemPrompt = customSystemPrompt ?? GetSystemPrompt(language);
 
         // エージェントを作成
         var agent = new ChatCompletionAgent
         {
             Name = AgentDefinition.ApprovalAgent.Name,
             Description = AgentDefinition.ApprovalAgent.Description,
-            Instructions = customSystemPrompt ?? AgentDefinition.ApprovalAgent.SystemPrompt,
+            Instructions = systemPrompt,
             Kernel = kernel
         };
 
         return await Task.FromResult(agent);
+    }
+
+    /// <summary>
+    /// 言語に応じたシステムプロンプトを取得します
+    /// </summary>
+    private static string GetSystemPrompt(string? language)
+    {
+        var isJapanese = language?.ToLowerInvariant() == "ja";
+
+        if (isJapanese)
+        {
+            return $"""
+                あなたはプルリクエストの承認決定を行うシニアテクニカルリードです。
+
+                あなたの役割:
+                1. コードレビュー結果を分析
+                2. 承認基準に照らして評価
+                3. 保守的でリスクを考慮した承認決定を行う
+                4. 判断について明確な理由を提供
+
+                ## 利用可能な関数
+                以下の関数を呼び出してアクションをバッファに追加してください:
+                - approve_pull_request - PRを承認
+                - request_changes - 変更を依頼
+                - post_pr_comment - 全体コメントを追加
+                - post_line_comment - 特定行にコメントを追加
+                - post_range_comment - 複数行にコメントを追加（開始行と終了行を指定）
+                - post_review_comment - レビューレベルのコメントを追加
+
+                ## 関数呼び出しの方法
+                関数を呼び出すには、関数名と必要なパラメータを明記してください:
+                例: 「approve_pull_request関数を呼び出します。コメント: 良好です」
+
+                すべてのアクションはバッファに追加され、分析完了後に一括でGitHubに投稿されます。
+
+                ## 承認基準
+                - critical: 重大な問題が0件であること
+                - major: 重大または重大な問題が0件であること
+                - minor: 軽微、重大、重大な問題が0件であること
+                - none: 常に承認
+
+                不確実な場合は、慎重を期して追加レビューまたは変更依頼を推奨します。
+                """;
+        }
+        else
+        {
+            return $"""
+                You are a senior technical lead responsible for making approval decisions on pull requests.
+
+                Your role is to:
+                1. Analyze code review results
+                2. Evaluate findings against approval thresholds
+                3. Make conservative, risk-aware approval decisions
+                4. Provide clear reasoning for your decisions
+
+                ## Available Functions
+                Call the following functions to add actions to buffer:
+                - approve_pull_request - Approve the PR
+                - request_changes - Request changes
+                - post_pr_comment - Add a general comment
+                - post_line_comment - Add a comment to a specific line
+                - post_range_comment - Add a comment to a range of lines
+                - post_review_comment - Add a review-level comment
+
+                ## How to Call Functions
+                Explicitly state that you are calling a function with its parameters:
+                Example: "I will call the approve_pull_request function with comment: Looks good."
+
+                All actions will be buffered and posted to GitHub after your analysis is complete.
+
+                ## Approval Thresholds
+                - critical: PR must have NO critical issues
+                - major: PR must have NO major or critical issues
+                - minor: PR must have NO minor, major, or critical issues
+                - none: Always approve
+
+                When in doubt, err on the side of caution and recommend rejection or additional review.
+                """;
+        }
     }
 
     /// <summary>
@@ -170,8 +253,8 @@ public class SKApprovalAgent
         // バッファを作成
         var buffer = new PRActionBuffer();
 
-        // バッファを使用したエージェントを作成
-        var agent = await CreateAgentWithBufferAsync(owner, repo, prNumber, buffer);
+        // バッファを使用したエージェントを作成（言語指定）
+        var agent = await CreateAgentWithBufferAsync(owner, repo, prNumber, buffer, language: language);
 
         // PR情報を取得
         var pr = await _gitHubService.GetPullRequestAsync(owner, repo, prNumber);
@@ -179,52 +262,90 @@ public class SKApprovalAgent
 
         // プロンプトを作成
         var autoApproveInstruction = autoApprove
-            ? "If the decision is to APPROVE, use the approve_pull_request function to add approval to buffer."
-            : "If the decision is to APPROVE, clearly state DECISION: APPROVE in your response.";
+            ? "判断が承認（APPROVE）の場合は、approve_pull_request関数を呼び出して承認をバッファに追加してください。"
+            : "判断が承認（APPROVE）の場合は、DECISION: APPROVEと明確に記載してください。";
 
         var prompt = $"""
-            Based on the code review below, make an approval decision for this pull request.
+            コードレビューの結果に基づいて、このプルリクエストの承認判断を行ってください。
 
-            ## Pull Request
-            - Title: {pr.Title}
-            - Author: {pr.User.Login}
+            ## プルリクエスト
+            - タイトル: {pr.Title}
+            - 作成者: {pr.User.Login}
 
-            ## Code Review Result
+            ## コードレビュー結果
             {reviewResult}
 
-            ## Approval Threshold
+            ## 承認基準
             {thresholdDescription}
 
-            Your task:
-            1. Analyze the review results against the approval threshold
-            2. Make a decision (APPROVE, CHANGES_REQUESTED, or COMMENT_ONLY)
+            あなたのタスク:
+            1. レビュー結果を承認基準と照らして分析
+            2. 判断を下してください（APPROVE、CHANGES_REQUESTED、COMMENT_ONLYのいずれか）
             3. {autoApproveInstruction}
-            4. If the decision is CHANGES_REQUESTED, use the request_changes function to add changes requested to buffer.
-            5. If there are specific concerns that need to be addressed, use:
-               - post_pr_comment for general comments
-               - post_line_comment for specific line-level feedback
-               - post_review_comment for review-level comments
+            4. 判断がCHANGES_REQUESTEDの場合、request_changes関数を呼び出して変更依頼をバッファに追加してください
+            5. 対処すべき懸念事項がある場合は、以下の関数を呼び出してください:
+               - post_pr_comment - 全般的なコメント
+               - post_line_comment - 特定行へのフィードバック
+               - post_range_comment - 複数行へのフィードバック（開始行と終了行を指定）
+               - post_review_comment - レビューレベルのコメント
 
-            All actions will be buffered and executed after your analysis is complete.
+            重要: すべてのアクションはバッファに追加され、分析完了後に一括で実行されます。
 
-            Provide your decision in this format:
+            以下の形式で判断を記載してください:
 
             DECISION: [APPROVE/CHANGES_REQUESTED/COMMENT_ONLY]
-            REASONING: [Explain why, listing any issues above the threshold]
-            CONDITIONS: [Any conditions for merge, or N/A]
-            APPROVAL_COMMENT: [Brief comment if approved, or N/A]
+            REASONING: [判断理由を説明]
+            CONDITIONS: [マージ条件があれば記載、なければN/A]
+            APPROVAL_COMMENT: [承認時のコメント、なければN/A]
 
-            Be conservative - when in doubt, request changes or add comments.
+            不確かな場合は、変更依頼またはコメントを追加してください。
             """;
 
         var chatHistory = new ChatHistory();
         chatHistory.AddUserMessage(prompt);
 
-        // エージェントを実行（関数呼び出しはバッファに追加される）
-        var responses = new System.Text.StringBuilder();
-        await foreach (var response in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
+        // FunctionCallingを有効にするために、Kernelから直接サービスを呼び出し
+        var kernel = agent.Kernel;
+        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+
+        // OpenAI用の実行設定でFunctionCallingを有効化
+        var executionSettings = new OpenAIPromptExecutionSettings
         {
-            responses.Append(response.Message.Content);
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+        };
+
+        var responses = new System.Text.StringBuilder();
+
+        // 関数呼び出しを含む可能性があるため、複数回の反復処理を行う
+        var maxIterations = 10;
+        var iteration = 0;
+
+        while (iteration < maxIterations)
+        {
+            iteration++;
+
+            // 非ストリーミングAPIで完全なレスポンスを取得
+            var contents = await chatService.GetChatMessageContentsAsync(
+                chatHistory,
+                executionSettings,
+                kernel,
+                cancellationToken);
+
+            var content = contents.FirstOrDefault();
+            if (content == null) break;
+
+            var currentResponse = content.Content ?? string.Empty;
+            responses.Append(currentResponse);
+            chatHistory.AddAssistantMessage(currentResponse);
+
+            // 関数呼び出しが行われたかチェック
+            var hasFunctionCalls = content.Items?.Any(i => i is FunctionCallContent) == true;
+
+            // 関数呼び出しがない場合はループを抜ける
+            if (!hasFunctionCalls)
+            {
+                break;
+            }
         }
 
         var responseText = responses.ToString();

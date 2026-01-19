@@ -4,7 +4,7 @@ public class AISettings
 {
     public const string SectionName = "AISettings";
 
-    public string Endpoint { get; set; } = string.Empty;  // デフォルトは空（環境変数で設定）
+    public string Endpoint { get; set; } = "https://api.openai.com/v1";  // デフォルトはOpenAI（環境変数で上書き可能）
     public string ApiKey { get; set; } = string.Empty;
     public string ModelId { get; set; } = "gpt-4o-mini";
     public int MaxTokens { get; set; } = 4000;
