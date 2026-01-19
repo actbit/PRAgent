@@ -9,14 +9,14 @@ public class AgentOrchestratorService : IAgentOrchestratorService
     private readonly ReviewAgent _reviewAgent;
     private readonly ApprovalAgent _approvalAgent;
     private readonly SummaryAgent _summaryAgent;
-    private readonly DetailedCommentAgent _detailedCommentAgent;
+    private readonly IDetailedCommentAgent _detailedCommentAgent;
     private readonly IGitHubService _gitHubService;
 
     public AgentOrchestratorService(
         ReviewAgent reviewAgent,
         ApprovalAgent approvalAgent,
         SummaryAgent summaryAgent,
-        DetailedCommentAgent detailedCommentAgent,
+        IDetailedCommentAgent detailedCommentAgent,
         IGitHubService gitHubService)
     {
         _reviewAgent = reviewAgent;
