@@ -76,7 +76,7 @@ internal class Program
                     services.AddSingleton(_ => prAgentConfig);
 
                     // GitHub Service
-                    services.AddSingleton<IGitHubService, GitHubService>();
+                    services.AddSingleton<IGitHubService>(_ => new GitHubService(prSettings.GitHubToken));
 
                     // Kernel Service
                     services.AddSingleton<IKernelService, KernelService>();
