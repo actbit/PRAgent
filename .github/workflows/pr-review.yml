@@ -41,7 +41,7 @@ jobs:
             --language ja \
             --post-comment
         env:
-          AISettings__Endpoint: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
+          AISettings__Endpoint: ${{ vars.AISETTINGS__ENDPOINT }}
           AISettings__ApiKey: ${{ secrets.AI_API_KEY }}
           AISettings__ModelId: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
           PRSettings__GitHubToken: ${{ secrets.GITHUB_TOKEN }}
