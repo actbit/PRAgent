@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PRAgent.Agents;
+using PRAgent.Agents.SK;
 using PRAgent.Models;
 using PRAgent.Services;
+using PRAgent.Services.SK;
 using PRAgent.Validators;
 using Serilog;
 
@@ -65,15 +67,17 @@ public static class ServiceCollectionExtensions
         // Data Services
         services.AddSingleton<PullRequestDataService>();
 
-        // Agents
-        services.AddSingleton<ReviewAgent>();
-        services.AddSingleton<ApprovalAgent>();
-        services.AddSingleton<SummaryAgent>();
-        services.AddSingleton<DetailedCommentAgent>();
+        // Detailed Comment Agent
         services.AddSingleton<IDetailedCommentAgent, DetailedCommentAgent>();
 
-        // Agent Orchestrator
-        services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();
+        // SK Agents (Semantic Kernel Agent Framework)
+        services.AddSingleton<PRAgentFactory>();
+        services.AddSingleton<SKReviewAgent>();
+        services.AddSingleton<SKSummaryAgent>();
+        services.AddSingleton<SKApprovalAgent>();
+
+        // Agent Orchestrator - SKAgentOrchestratorServiceを使用
+        services.AddSingleton<IAgentOrchestratorService, SKAgentOrchestratorService>();
 
         // PR Analysis Service
         services.AddSingleton<IPRAnalysisService, PRAnalysisService>();

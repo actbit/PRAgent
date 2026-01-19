@@ -152,4 +152,58 @@ public class GitHubService : IGitHubService
         var content = await GetRepositoryFileContentAsync(owner, repo, path, branch);
         return content != null;
     }
+
+    public async Task<PullRequestReview> CreateLineCommentAsync(string owner, string repo, int prNumber, string filePath, int lineNumber, string comment, string? suggestion = null)
+    {
+        // 行コメントを作成
+        var commentBody = suggestion != null ? $"{comment}\n```suggestion\n{suggestion}\n```" : comment;
+
+        return await _client.PullRequest.Review.Create(
+            owner,
+            repo,
+            prNumber,
+            new PullRequestReviewCreate
+            {
+                Event = PullRequestReviewEvent.Comment,
+                Comments = new List<DraftPullRequestReviewComment>
+                {
+                    new DraftPullRequestReviewComment(commentBody, filePath, lineNumber)
+                }
+            }
+        );
+    }
+
+    public async Task<PullRequestReview> CreateMultipleLineCommentsAsync(string owner, string repo, int prNumber, List<(string FilePath, int? LineNumber, int? StartLine, int? EndLine, string Comment, string? Suggestion)> comments)
+    {
+        var draftComments = comments.Select(c =>
+        {
+            var commentBody = c.Suggestion != null ? $"{c.Comment}\n```suggestion\n{c.Suggestion}\n```" : c.Comment;
+
+            // 1行コメントのみ対応（LineNumberがある場合）
+            if (c.LineNumber.HasValue)
+            {
+                return new DraftPullRequestReviewComment(commentBody, c.FilePath, c.LineNumber.Value);
+            }
+            // 範囲コメントは1行目を使用
+            else if (c.StartLine.HasValue)
+            {
+                return new DraftPullRequestReviewComment(commentBody, c.FilePath, c.StartLine.Value);
+            }
+            else
+            {
+                throw new ArgumentException($"Comment must have either LineNumber or StartLine: {c.FilePath}");
+            }
+        }).ToList();
+
+        return await _client.PullRequest.Review.Create(
+            owner,
+            repo,
+            prNumber,
+            new PullRequestReviewCreate
+            {
+                Event = PullRequestReviewEvent.Comment,
+                Comments = draftComments
+            }
+        );
+    }
 }
