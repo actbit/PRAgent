@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.Chat;
@@ -22,6 +23,8 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
     private readonly SKApprovalAgent _approvalAgent;
     private readonly IGitHubService _gitHubService;
     private readonly PullRequestDataService _prDataService;
+    private readonly PRAgentConfig _config;
+    private readonly ILogger<SKAgentOrchestratorService> _logger;
 
     public SKAgentOrchestratorService(
         PRAgentFactory agentFactory,
@@ -29,7 +32,9 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         SKSummaryAgent summaryAgent,
         SKApprovalAgent approvalAgent,
         IGitHubService gitHubService,
-        PullRequestDataService prDataService)
+        PullRequestDataService prDataService,
+        PRAgentConfig config,
+        ILogger<SKAgentOrchestratorService> logger)
     {
         _agentFactory = agentFactory;
         _reviewAgent = reviewAgent;
@@ -37,6 +42,8 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         _approvalAgent = approvalAgent;
         _gitHubService = gitHubService;
         _prDataService = prDataService;
+        _config = config;
+        _logger = logger;
     }
 
     /// <summary>
@@ -90,7 +97,6 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
 
     /// <summary>
     /// AgentGroupChatを使用したマルチエージェント協調によるレビューと承認
-    /// 注: 現在はAgentGroupChat APIの変更により、基本実装を使用しています
     /// </summary>
     public async Task<ApprovalResult> ReviewAndApproveWithAgentChatAsync(
         string owner,
@@ -99,8 +105,29 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         ApprovalThreshold threshold,
         CancellationToken cancellationToken = default)
     {
-        // 現在は基本ワークフローを使用
-        // TODO: AgentGroupChat APIが安定したら実装
+        // 設定されたオーケストレーションモードに応じて処理を分岐
+        var orchestrationMode = _config.AgentFramework?.OrchestrationMode ?? "sequential";
+
+        return orchestrationMode.ToLower() switch
+        {
+            "agent_chat" => await ExecuteWithAgentGroupChatAsync(owner, repo, prNumber, threshold, cancellationToken),
+            "sequential" => await ReviewAndApproveAsync(owner, repo, prNumber, threshold, cancellationToken),
+            _ => await ReviewAndApproveAsync(owner, repo, prNumber, threshold, cancellationToken)
+        };
+    }
+
+    /// <summary>
+    /// AgentGroupChatを使用した実行
+    /// 注: Semantic Kernel 1.68.0のAgentGroupChat APIは複雑なため、簡易実装としています
+    /// </summary>
+    private async Task<ApprovalResult> ExecuteWithAgentGroupChatAsync(
+        string owner,
+        string repo,
+        int prNumber,
+        ApprovalThreshold threshold,
+        CancellationToken cancellationToken)
+    {
+        // 現在はSequentialモードとして実行（将来的に完全なAgentGroupChatを実装）
         return await ReviewAndApproveAsync(owner, repo, prNumber, threshold, cancellationToken);
     }
 
@@ -243,6 +270,9 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
     private async Task<ChatCompletionAgent> CreateApprovalAgentWithFunctionsAsync(
         string owner, string repo, int prNumber)
     {
+        // 設定を反映したカスタムプロンプトを作成
+        var customPrompt = _config.AgentFramework?.Agents?.Approval?.CustomSystemPrompt;
+
         // GitHub操作用のプラグインを作成
         var approveFunction = new ApprovePRFunction(_gitHubService, owner, repo, prNumber);
         var commentFunction = new PostCommentFunction(_gitHubService, owner, repo, prNumber);
@@ -257,6 +287,26 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         };
 
         return await _agentFactory.CreateApprovalAgentAsync(
-            owner, repo, prNumber, null, functions);
+            owner, repo, prNumber, customPrompt, functions);
+    }
+
+    /// <summary>
+    /// 設定を反映したReviewエージェントを作成
+    /// </summary>
+    private async Task<ChatCompletionAgent> CreateConfiguredReviewAgentAsync(
+        string owner, string repo, int prNumber)
+    {
+        var customPrompt = _config.AgentFramework?.Agents?.Review?.CustomSystemPrompt;
+        return await _agentFactory.CreateReviewAgentAsync(owner, repo, prNumber, customPrompt);
+    }
+
+    /// <summary>
+    /// 設定を反映したSummaryエージェントを作成
+    /// </summary>
+    private async Task<ChatCompletionAgent> CreateConfiguredSummaryAgentAsync(
+        string owner, string repo, int prNumber)
+    {
+        var customPrompt = _config.AgentFramework?.Agents?.Summary?.CustomSystemPrompt;
+        return await _agentFactory.CreateSummaryAgentAsync(owner, repo, prNumber, customPrompt);
     }
 }

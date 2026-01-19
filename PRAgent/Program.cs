@@ -5,6 +5,7 @@ using PRAgent.Agents;
 using PRAgent.Agents.SK;
 using PRAgent.Models;
 using PRAgent.Services;
+using PRAgent.Services.SK;
 using PRAgent.Validators;
 using Serilog;
 
@@ -68,6 +69,11 @@ internal class Program
                     services.AddSingleton(_ => aiSettings);
                     services.AddSingleton(_ => prSettings);
 
+                    // PRAgent Configuration
+                    var prAgentConfig = configuration.GetSection("PRAgent").Get<PRAgentConfig>()
+                        ?? new PRAgentConfig();
+                    services.AddSingleton(_ => prAgentConfig);
+
                     // GitHub Service
                     services.AddSingleton<IGitHubService, GitHubService>();
 
@@ -91,9 +97,17 @@ internal class Program
                     services.AddSingleton<SKSummaryAgent>();
                     services.AddSingleton<SKApprovalAgent>();
 
-                    // Agent Orchestrator (現在は既存の実装を使用)
-                    // TODO: 将来的にSKAgentOrchestratorServiceに切り替え
-                    services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();
+                    // Agent Orchestrator - AgentFramework設定に応じて切り替え
+                    if (prAgentConfig.AgentFramework?.Enabled == true)
+                    {
+                        services.AddSingleton<IAgentOrchestratorService, SKAgentOrchestratorService>();
+                        Log.Information("Using SKAgentOrchestratorService (Agent Framework enabled)");
+                    }
+                    else
+                    {
+                        services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();
+                        Log.Information("Using AgentOrchestratorService (standard mode)");
+                    }
 
                     // PR Analysis Service
                     services.AddSingleton<IPRAnalysisService, PRAnalysisService>();
