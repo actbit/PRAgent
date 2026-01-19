@@ -96,6 +96,39 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
     }
 
     /// <summary>
+    /// プルリクエストのコードレビューを実行します（language指定）
+    /// </summary>
+    public async Task<string> ReviewAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default)
+    {
+        // languageパラメータは現在のSK実装では使用しない
+        return await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// プルリクエストの要約を作成します（language指定）
+    /// </summary>
+    public async Task<string> SummarizeAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default)
+    {
+        // languageパラメータは現在のSK実装では使用しない
+        return await _summaryAgent.SummarizeAsync(owner, repo, prNumber, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// レビューと承認を一連のワークフローとして実行します（language指定）
+    /// </summary>
+    public async Task<ApprovalResult> ReviewAndApproveAsync(
+        string owner,
+        string repo,
+        int prNumber,
+        ApprovalThreshold threshold,
+        string language,
+        CancellationToken cancellationToken = default)
+    {
+        // languageパラメータは現在のSK実装では使用しない
+        return await ReviewAndApproveAsync(owner, repo, prNumber, threshold, cancellationToken);
+    }
+
+    /// <summary>
     /// AgentGroupChatを使用したマルチエージェント協調によるレビューと承認
     /// </summary>
     public async Task<ApprovalResult> ReviewAndApproveWithAgentChatAsync(
