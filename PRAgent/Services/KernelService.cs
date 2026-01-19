@@ -25,11 +25,24 @@ public class KernelService : IKernelService
     {
         var builder = Kernel.CreateBuilder();
 
-        builder.AddOpenAIChatCompletion(
-            modelId: _aiSettings.ModelId,
-            apiKey: _aiSettings.ApiKey,
-            endpoint: new Uri(_aiSettings.Endpoint)
-        );
+        var endpoint = _aiSettings.Endpoint;
+
+        // エンドポイントが指定されている場合はカスタムエンドポイントを使用
+        if (!string.IsNullOrEmpty(endpoint) && endpoint != "https://api.openai.com/v1")
+        {
+            builder.Services.AddOpenAIChatCompletion(
+                modelId: _aiSettings.ModelId,
+                apiKey: _aiSettings.ApiKey,
+                endpoint: new Uri(endpoint)
+            );
+        }
+        else
+        {
+            builder.AddOpenAIChatCompletion(
+                modelId: _aiSettings.ModelId,
+                apiKey: _aiSettings.ApiKey
+            );
+        }
 
         var kernel = builder.Build();
 
@@ -40,20 +53,26 @@ public class KernelService : IKernelService
     {
         var builder = Kernel.CreateBuilder();
 
-        builder.AddOpenAIChatCompletion(
-            modelId: _aiSettings.ModelId,
-            apiKey: _aiSettings.ApiKey,
-            endpoint: new Uri(_aiSettings.Endpoint)
-        );
+        var endpoint = _aiSettings.Endpoint;
+
+        // エンドポイントが指定されている場合はカスタムエンドポイントを使用
+        if (!string.IsNullOrEmpty(endpoint) && endpoint != "https://api.openai.com/v1")
+        {
+            builder.Services.AddOpenAIChatCompletion(
+                modelId: _aiSettings.ModelId,
+                apiKey: _aiSettings.ApiKey,
+                endpoint: new Uri(endpoint)
+            );
+        }
+        else
+        {
+            builder.AddOpenAIChatCompletion(
+                modelId: _aiSettings.ModelId,
+                apiKey: _aiSettings.ApiKey
+            );
+        }
 
         var kernel = builder.Build();
-
-        // 注: SetDefaultSystemPromptは現在のバージョンではまだ利用できない
-        // 将来的には以下のようにsystemPromptを設定できるようになる予定
-        // if (!string.IsNullOrEmpty(systemPrompt))
-        // {
-        //     kernel.SetDefaultSystemPrompt(systemPrompt);
-        // }
 
         return kernel;
     }
