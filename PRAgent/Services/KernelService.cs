@@ -28,8 +28,9 @@ public class KernelService : IKernelService
         var endpoint = _aiSettings.Endpoint;
 
         // エンドポイントが指定されている場合はカスタムエンドポイントを使用
-        if (!string.IsNullOrEmpty(endpoint) && endpoint != "https://api.openai.com/v1")
+        if (!string.IsNullOrEmpty(endpoint))
         {
+            _logger?.LogInformation("Using custom endpoint: {Endpoint}", endpoint);
             builder.Services.AddOpenAIChatCompletion(
                 modelId: _aiSettings.ModelId,
                 apiKey: _aiSettings.ApiKey,
@@ -38,6 +39,7 @@ public class KernelService : IKernelService
         }
         else
         {
+            _logger?.LogInformation("Using default OpenAI endpoint");
             builder.AddOpenAIChatCompletion(
                 modelId: _aiSettings.ModelId,
                 apiKey: _aiSettings.ApiKey
@@ -56,8 +58,9 @@ public class KernelService : IKernelService
         var endpoint = _aiSettings.Endpoint;
 
         // エンドポイントが指定されている場合はカスタムエンドポイントを使用
-        if (!string.IsNullOrEmpty(endpoint) && endpoint != "https://api.openai.com/v1")
+        if (!string.IsNullOrEmpty(endpoint))
         {
+            _logger?.LogInformation("Using custom endpoint: {Endpoint}", endpoint);
             builder.Services.AddOpenAIChatCompletion(
                 modelId: _aiSettings.ModelId,
                 apiKey: _aiSettings.ApiKey,
@@ -66,6 +69,7 @@ public class KernelService : IKernelService
         }
         else
         {
+            _logger?.LogInformation("Using default OpenAI endpoint");
             builder.AddOpenAIChatCompletion(
                 modelId: _aiSettings.ModelId,
                 apiKey: _aiSettings.ApiKey
