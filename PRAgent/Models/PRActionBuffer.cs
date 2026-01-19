@@ -28,6 +28,21 @@ public class PRActionBuffer
     }
 
     /// <summary>
+    /// 範囲コメントを追加します
+    /// </summary>
+    public void AddRangeComment(string filePath, int startLine, int endLine, string comment, string? suggestion = null)
+    {
+        _lineComments.Add(new LineCommentAction
+        {
+            FilePath = filePath,
+            StartLine = startLine,
+            EndLine = endLine,
+            Comment = comment,
+            Suggestion = suggestion
+        });
+    }
+
+    /// <summary>
     /// レビューコメントを追加します
     /// </summary>
     public void AddReviewComment(string comment)
@@ -130,7 +145,9 @@ public enum PRApprovalState
 public class LineCommentAction
 {
     public required string FilePath { get; init; }
-    public required int LineNumber { get; init; }
+    public int? LineNumber { get; init; }
+    public int? StartLine { get; init; }
+    public int? EndLine { get; init; }
     public required string Comment { get; init; }
     public string? Suggestion { get; init; }
 }

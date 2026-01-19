@@ -173,12 +173,26 @@ public class GitHubService : IGitHubService
         );
     }
 
-    public async Task<PullRequestReview> CreateMultipleLineCommentsAsync(string owner, string repo, int prNumber, List<(string FilePath, int LineNumber, string Comment, string? Suggestion)> comments)
+    public async Task<PullRequestReview> CreateMultipleLineCommentsAsync(string owner, string repo, int prNumber, List<(string FilePath, int? LineNumber, int? StartLine, int? EndLine, string Comment, string? Suggestion)> comments)
     {
         var draftComments = comments.Select(c =>
         {
             var commentBody = c.Suggestion != null ? $"{c.Comment}\n```suggestion\n{c.Suggestion}\n```" : c.Comment;
-            return new DraftPullRequestReviewComment(commentBody, c.FilePath, c.LineNumber);
+
+            // 1行コメントのみ対応（LineNumberがある場合）
+            if (c.LineNumber.HasValue)
+            {
+                return new DraftPullRequestReviewComment(commentBody, c.FilePath, c.LineNumber.Value);
+            }
+            // 範囲コメントは1行目を使用
+            else if (c.StartLine.HasValue)
+            {
+                return new DraftPullRequestReviewComment(commentBody, c.FilePath, c.StartLine.Value);
+            }
+            else
+            {
+                throw new ArgumentException($"Comment must have either LineNumber or StartLine: {c.FilePath}");
+            }
         }).ToList();
 
         return await _client.PullRequest.Review.Create(

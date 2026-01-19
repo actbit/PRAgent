@@ -88,7 +88,7 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         {
             // FunctionCalling使用 - PRActionResultが返される
             var (_, reasoningFc, commentFc, actionResult) = await _approvalAgent.DecideWithFunctionCallingAsync(
-                owner, repo, prNumber, review, threshold, autoApprove, cancellationToken);
+                owner, repo, prNumber, review, threshold, autoApprove, language: null, cancellationToken);
             shouldApprove = actionResult?.Approved ?? false;
             reasoning = reasoningFc;
             comment = commentFc;

@@ -62,6 +62,47 @@ public class PostCommentFunction
     }
 
     /// <summary>
+    /// プルリクエストの特定の範囲にコメントを追加します（バッファに追加）
+    /// </summary>
+    /// <param name="filePath">ファイルパス</param>
+    /// <param name="startLine">開始行番号</param>
+    /// <param name="endLine">終了行番号</param>
+    /// <param name="comment">コメント内容</param>
+    /// <param name="suggestion">提案される変更内容（オプション）</param>
+    /// <returns>範囲コメントがバッファに追加されたことを示すメッセージ</returns>
+    [KernelFunction("post_range_comment")]
+    public string PostRangeCommentAsync(
+        string filePath,
+        int startLine,
+        int endLine,
+        string comment,
+        string? suggestion = null)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return "Error: File path cannot be empty";
+        }
+
+        if (startLine <= 0 || endLine <= 0)
+        {
+            return "Error: Line numbers must be positive";
+        }
+
+        if (startLine > endLine)
+        {
+            return "Error: startLine must be less than or equal to endLine";
+        }
+
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            return "Error: Comment cannot be empty";
+        }
+
+        _buffer.AddRangeComment(filePath, startLine, endLine, comment, suggestion);
+        return $"Range comment has been added to buffer for {filePath}:{startLine}-{endLine}";
+    }
+
+    /// <summary>
     /// レビューコメントを追加します（バッファに追加）
     /// </summary>
     /// <param name="reviewBody">レビュー本文</param>

@@ -65,7 +65,9 @@ public class CommentCommandHandler : ICommandHandler
                     .Where(c => c != null)
                     .Select(c => (
                         FilePath: c!.FilePath,
-                        LineNumber: c.LineNumber,
+                        LineNumber: (int?)c.LineNumber,
+                        StartLine: (int?)null,
+                        EndLine: (int?)null,
                         Comment: c.CommentText,
                         Suggestion: c.SuggestionText
                     ))

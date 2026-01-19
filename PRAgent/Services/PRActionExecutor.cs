@@ -40,12 +40,25 @@ public class PRActionExecutor
 
         try
         {
-            // 1. 行コメントを投稿
+            // 1. レビューコメントを投稿
+            if (buffer.ReviewComments.Count > 0)
+            {
+                foreach (var reviewComment in buffer.ReviewComments)
+                {
+                    await _gitHubService.CreateReviewCommentAsync(
+                        _owner, _repo, _prNumber, reviewComment.Comment);
+                }
+                result.ReviewCommentsPosted = buffer.ReviewComments.Count;
+            }
+
+            // 2. 行コメントを投稿
             if (buffer.LineComments.Count > 0)
             {
                 var comments = buffer.LineComments.Select(c => (
                     c.FilePath,
                     c.LineNumber,
+                    c.StartLine,
+                    c.EndLine,
                     c.Comment,
                     c.Suggestion
                 )).ToList();
@@ -54,10 +67,9 @@ public class PRActionExecutor
                     _owner, _repo, _prNumber, comments);
 
                 result.LineCommentsPosted = comments.Count;
-                result.Success = true;
             }
 
-            // 2. サマリーを全体コメントとして投稿
+            // 3. サマリーを全体コメントとして投稿
             if (buffer.Summaries.Count > 0)
             {
                 var summaryText = string.Join("\n\n", buffer.Summaries);
@@ -71,7 +83,7 @@ public class PRActionExecutor
                 result.SummaryCommentUrl = commentResult.HtmlUrl;
             }
 
-            // 3. 全体コメントを投稿
+            // 4. 全体コメントを投稿
             if (!string.IsNullOrEmpty(buffer.GeneralComment))
             {
                 var commentResult = await _gitHubService.CreateIssueCommentAsync(
@@ -81,7 +93,7 @@ public class PRActionExecutor
                 result.GeneralCommentUrl = commentResult.HtmlUrl;
             }
 
-            // 4. 承認ステータスに応じた処理を実行
+            // 5. 承認ステータスに応じた処理を実行
             switch (buffer.ApprovalState)
             {
                 case PRApprovalState.Approved:
@@ -109,6 +121,7 @@ public class PRActionExecutor
             }
 
             result.TotalActionsPosted =
+                result.ReviewCommentsPosted +
                 result.LineCommentsPosted +
                 result.SummariesPosted +
                 (result.GeneralCommentPosted ? 1 : 0) +
@@ -202,6 +215,7 @@ public class PRActionResult
     public int PrNumber { get; init; }
     public bool Success { get; set; }
     public int TotalActionsPosted { get; set; }
+    public int ReviewCommentsPosted { get; set; }
     public int LineCommentsPosted { get; set; }
     public int SummariesPosted { get; set; }
     public bool GeneralCommentPosted { get; set; }

@@ -1,6 +1,7 @@
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using PRAgent.Models;
 using PRAgent.Services;
 using PRAgent.Plugins.GitHub;
@@ -138,8 +139,8 @@ public class SKApprovalAgent
 
         // Kernelを作成してプラグインを登録
         var kernel = _agentFactory.CreateApprovalKernel(owner, repo, prNumber, customSystemPrompt);
-        kernel.ImportPluginFromObject(approvePlugin);
-        kernel.ImportPluginFromObject(commentPlugin);
+        kernel.ImportPluginFromObject(approvePlugin, "ApprovePR");
+        kernel.ImportPluginFromObject(commentPlugin, "PostComment");
 
         // エージェントを作成
         var agent = new ChatCompletionAgent
@@ -163,6 +164,7 @@ public class SKApprovalAgent
         string reviewResult,
         ApprovalThreshold threshold,
         bool autoApprove = false,
+        string? language = null,
         CancellationToken cancellationToken = default)
     {
         // バッファを作成
