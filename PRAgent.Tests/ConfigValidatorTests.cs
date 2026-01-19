@@ -117,12 +117,45 @@ public class ConfigValidatorTests
         };
         var errors = new List<string>();
 
+        // Ensure GITHUB_ACTIONS is not set for this test
+        Environment.SetEnvironmentVariable("GITHUB_ACTIONS", null);
+
         // Act
         var result = ConfigValidator.ValidatePRSettings(settings, errors);
 
         // Assert
         Assert.False(result);
-        Assert.Contains("GitHub Token is required.", errors);
+        Assert.NotEmpty(errors);
+        Assert.Contains("GitHub Token is required", errors[0]);
+    }
+
+    [Fact]
+    public void ValidatePRSettings_MissingToken_InGitHubActions_ReturnsTrue()
+    {
+        // Arrange
+        var settings = new PRSettings
+        {
+            GitHubToken = ""
+        };
+        var errors = new List<string>();
+
+        // Simulate GitHub Actions environment
+        Environment.SetEnvironmentVariable("GITHUB_ACTIONS", "true");
+
+        try
+        {
+            // Act
+            var result = ConfigValidator.ValidatePRSettings(settings, errors);
+
+            // Assert
+            Assert.True(result);
+            Assert.Empty(errors);
+        }
+        finally
+        {
+            // Cleanup
+            Environment.SetEnvironmentVariable("GITHUB_ACTIONS", null);
+        }
     }
 
     [Theory]

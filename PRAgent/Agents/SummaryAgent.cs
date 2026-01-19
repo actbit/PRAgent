@@ -12,10 +12,13 @@ public class SummaryAgent : BaseAgent
         IKernelService kernelService,
         IGitHubService gitHubService,
         PullRequestDataService prDataService,
+        AISettings aiSettings,
         string? customSystemPrompt = null)
-        : base(kernelService, gitHubService, prDataService, AgentDefinition.SummaryAgent, customSystemPrompt)
+        : base(kernelService, gitHubService, prDataService, aiSettings, AgentDefinition.SummaryAgent, customSystemPrompt)
     {
     }
+
+    public new void SetLanguage(string language) => base.SetLanguage(language);
 
     public async Task<string> SummarizeAsync(
         string owner,
@@ -37,7 +40,7 @@ public class SummaryAgent : BaseAgent
     }
 
     /// <summary>
-    /// Function Callingを使用してサマリーを作成し、アクションをバッファに蓄積します
+    /// Function Calling��g�p���ăT�}���[��쐬���A�A�N�V������o�b�t�@�ɒ~�ς��܂�
     /// </summary>
     public async Task<string> SummarizeWithActionsAsync(
         string owner,
@@ -49,7 +52,7 @@ public class SummaryAgent : BaseAgent
         var (pr, files, diff) = await GetPRDataAsync(owner, repo, prNumber);
         var fileList = PullRequestDataService.FormatFileList(files);
 
-        // Kernelを作成して関数を登録
+        // Kernel��쐬���Ċ֐���o�^
         var kernel = CreateKernel();
         var actionFunctions = new PRActionFunctions(buffer);
         kernel.ImportPluginFromObject(actionFunctions, "pr_actions");
@@ -96,19 +99,19 @@ public class SummaryAgent : BaseAgent
             When you're done, call ready_to_commit.
             """;
 
-        // 注: Semantic Kernel 1.68.0でのFunction Callingは、複雑なTool Call処理が必要です
-        // 現在は簡易的な実装として、通常のサマリーを実行します
-        // 将来的には、Auto Commitオプションで完全なFunction Callingを実装予定
+        // ��: Semantic Kernel 1.68.0�ł�Function Calling�́A���G��Tool Call�������K�v�ł�
+        // ���݂͊ȈՓI�Ȏ����Ƃ��āA�ʏ�̃T�}���[����s���܂�
+        // �����I�ɂ́AAuto Commit�I�v�V�����Ŋ��S��Function Calling������\��
 
         var resultBuilder = new System.Text.StringBuilder();
 
-        // 通常のサマリーを実行して結果を取得
+        // �ʏ�̃T�}���[����s���Č��ʂ�擾
         var summaryResult = await KernelService.InvokePromptAsStringAsync(kernel, prompt, cancellationToken);
         resultBuilder.Append(summaryResult);
 
-        // 注: 実際のFunction Calling実装時は、ここでTool Callを処理してバッファに追加
+        // ��: ���ۂ�Function Calling�������́A������Tool Call��������ăo�b�t�@�ɒǉ�
 
-        // バッファの状態を追加（デモ用）
+        // �o�b�t�@�̏�Ԃ�ǉ��i�f���p�j
         var state = buffer.GetState();
         resultBuilder.AppendLine($"\n\n## Summary Summary");
         resultBuilder.AppendLine($"Summaries added: {state.SummaryCount}");

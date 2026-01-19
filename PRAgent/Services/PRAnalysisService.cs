@@ -22,7 +22,7 @@ public class PRAnalysisService : IPRAnalysisService
         _logger = logger;
     }
 
-    public async Task<string> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool postComment = false)
+    public async Task<string> ReviewPullRequestAsync(string owner, string repo, int prNumber, bool postComment = false, string? language = null)
     {
         _logger.LogInformation("Starting PR review for {Owner}/{Repo}#{PrNumber}", owner, repo, prNumber);
 
@@ -38,7 +38,9 @@ public class PRAnalysisService : IPRAnalysisService
             return "Review is disabled for this repository.";
         }
 
-        var review = await _agentOrchestrator.ReviewAsync(owner, repo, prNumber);
+        var review = !string.IsNullOrEmpty(language)
+            ? await _agentOrchestrator.ReviewAsync(owner, repo, prNumber, language)
+            : await _agentOrchestrator.ReviewAsync(owner, repo, prNumber);
 
         if (postComment)
         {
@@ -50,7 +52,7 @@ public class PRAnalysisService : IPRAnalysisService
         return review;
     }
 
-    public async Task<string> SummarizePullRequestAsync(string owner, string repo, int prNumber, bool postComment = false)
+    public async Task<string> SummarizePullRequestAsync(string owner, string repo, int prNumber, bool postComment = false, string? language = null)
     {
         _logger.LogInformation("Starting PR summary for {Owner}/{Repo}#{PrNumber}", owner, repo, prNumber);
 
@@ -66,7 +68,9 @@ public class PRAnalysisService : IPRAnalysisService
             return "Summary is disabled for this repository.";
         }
 
-        var summary = await _agentOrchestrator.SummarizeAsync(owner, repo, prNumber);
+        var summary = !string.IsNullOrEmpty(language)
+            ? await _agentOrchestrator.SummarizeAsync(owner, repo, prNumber, language)
+            : await _agentOrchestrator.SummarizeAsync(owner, repo, prNumber);
 
         if (postComment)
         {
@@ -83,7 +87,8 @@ public class PRAnalysisService : IPRAnalysisService
         string repo,
         int prNumber,
         ApprovalThreshold threshold,
-        bool postComment = false)
+        bool postComment = false,
+        string? language = null)
     {
         _logger.LogInformation("Starting PR review and approval for {Owner}/{Repo}#{PrNumber}", owner, repo, prNumber);
 
@@ -109,7 +114,9 @@ public class PRAnalysisService : IPRAnalysisService
             };
         }
 
-        var result = await _agentOrchestrator.ReviewAndApproveAsync(owner, repo, prNumber, threshold);
+        var result = !string.IsNullOrEmpty(language)
+            ? await _agentOrchestrator.ReviewAndApproveAsync(owner, repo, prNumber, threshold, language)
+            : await _agentOrchestrator.ReviewAndApproveAsync(owner, repo, prNumber, threshold);
 
         if (postComment && !result.Approved)
         {

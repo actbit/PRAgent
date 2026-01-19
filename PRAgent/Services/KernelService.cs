@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
@@ -8,10 +9,16 @@ namespace PRAgent.Services;
 public class KernelService : IKernelService
 {
     private readonly AISettings _aiSettings;
+    private ILogger? _logger;
 
     public KernelService(AISettings aiSettings)
     {
         _aiSettings = aiSettings;
+    }
+
+    public void SetLogger(ILogger logger)
+    {
+        _logger = logger;
     }
 
     public Kernel CreateKernel(string? systemPrompt = null)
@@ -80,14 +87,20 @@ public class KernelService : IKernelService
         string prompt,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        // プロンプットを出力
+        _logger?.LogInformation("=== KernelService Prompt ===\n{Prompt}", prompt);
+
         var service = kernel.GetRequiredService<IChatCompletionService>();
         var chatHistory = new ChatHistory();
         chatHistory.AddUserMessage(prompt);
 
         await foreach (var content in service.GetStreamingChatMessageContentsAsync(chatHistory, cancellationToken: cancellationToken))
         {
-            yield return content.Content ?? string.Empty;
+            var responseContent = content.Content ?? string.Empty;
+            yield return responseContent;
         }
+
+        _logger?.LogInformation("=== KernelService Response (Streaming) ===\n{Response}", "<streaming response>");
     }
 
     public async Task<string> InvokePromptAsStringAsync(
@@ -95,6 +108,9 @@ public class KernelService : IKernelService
         string prompt,
         CancellationToken cancellationToken = default)
     {
+        // プロンプットを出力
+        _logger?.LogInformation("=== KernelService Prompt ===\n{Prompt}", prompt);
+
         var resultBuilder = new System.Text.StringBuilder();
 
         await foreach (var content in InvokePromptAsync(kernel, prompt, cancellationToken))
@@ -102,6 +118,9 @@ public class KernelService : IKernelService
             resultBuilder.Append(content);
         }
 
-        return resultBuilder.ToString();
+        var response = resultBuilder.ToString();
+        _logger?.LogInformation("=== KernelService Response ===\n{Response}", response);
+
+        return response;
     }
 }

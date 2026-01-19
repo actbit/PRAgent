@@ -1,0 +1,46 @@
+# PR Review - AI-powered Pull Request Review for this repository
+# PR作成/更新時に自動的にAIレビューを実行
+
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    name: AI PR Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: false
+
+      - name: Build PRAgent
+        run: dotnet build PRAgent/PRAgent.csproj -c Release
+
+      - name: Run PRAgent Review
+        run: |
+          dotnet PRAgent/bin/Release/net10.0/PRAgent.dll \
+            review \
+            --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
+            --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --post-comment
+        env:
+          AISettings__Endpoint: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
+          AISettings__ApiKey: ${{ secrets.AI_API_KEY }}
+          AISettings__ModelId: ${{ vars.AI_MODEL_ID || 'gpt-4o-mini' }}
+          PRSettings__GitHubToken: ${{ secrets.GITHUB_TOKEN }}

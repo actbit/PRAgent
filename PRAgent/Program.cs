@@ -115,7 +115,7 @@ internal class Program
                 .Build();
 
             // Run CLI
-            return await RunCliAsync(args, host.Services, configuration);
+            return await RunCliAsync(args, host.Services);
         }
         catch (Exception ex)
         {
@@ -128,26 +128,31 @@ internal class Program
         }
     }
 
-    static async Task<int> RunCliAsync(string[] args, IServiceProvider services, IConfiguration configuration)
+    static async Task<int> RunCliAsync(string[] args, IServiceProvider services)
     {
         if (args.Length == 0)
         {
-            ShowHelp();
+            HelpTextGenerator.ShowHelp();
             return 0;
         }
 
         var command = args[0].ToLowerInvariant();
-        var prSettings = services.GetRequiredService<PRSettings>();
 
         try
         {
-            switch (command)
+            var commandHandler = command switch
             {
-                case "review":
-                    return await RunReviewCommandAsync(args, services);
+                "review" => CreateReviewHandler(args, services),
+                "summary" => CreateSummaryHandler(args, services),
+                "approve" => CreateApproveHandler(args, services),
+                "help" or "--help" or "-h" => null,
+                _ => null
+            };
 
-                case "summary":
-                    return await RunSummaryCommandAsync(args, services);
+            if (commandHandler is not null)
+            {
+                return await commandHandler.ExecuteAsync();
+            }
 
                 case "approve":
                     return await RunApproveCommandAsync(args, services);
@@ -161,11 +166,9 @@ internal class Program
                     ShowHelp();
                     return 0;
 
-                default:
-                    Log.Error("Unknown command: {Command}", command);
-                    ShowHelp();
-                    return 1;
-            }
+            Log.Error("Unknown command: {Command}", command);
+            HelpTextGenerator.ShowHelp();
+            return 1;
         }
         catch (Exception ex)
         {
@@ -174,19 +177,12 @@ internal class Program
         }
     }
 
-    static async Task<int> RunReviewCommandAsync(string[] args, IServiceProvider services)
+    private static ICommandHandler CreateReviewHandler(string[] args, IServiceProvider services)
     {
-        var options = ParseReviewOptions(args);
-
-        if (!options.IsValid(out var errors))
-        {
-            Log.Error("Invalid options:");
-            foreach (var error in errors)
-            {
-                Log.Error("  - {Error}", error);
-            }
-            return 1;
-        }
+        var options = CommandLineParser.ParseReviewOptions(args);
+        var prAnalysisService = services.GetRequiredService<IPRAnalysisService>();
+        return new ReviewCommandHandler(options, prAnalysisService);
+    }
 
         if (options.AutoCommit)
         {
@@ -282,17 +278,10 @@ internal class Program
 
     static async Task<int> RunSummaryCommandAsync(string[] args, IServiceProvider services)
     {
-        var options = ParseSummaryOptions(args);
-
-        if (!options.IsValid(out var errors))
-        {
-            Log.Error("Invalid options:");
-            foreach (var error in errors)
-            {
-                Log.Error("  - {Error}", error);
-            }
-            return 1;
-        }
+        var options = CommandLineParser.ParseSummaryOptions(args);
+        var prAnalysisService = services.GetRequiredService<IPRAnalysisService>();
+        return new SummaryCommandHandler(options, prAnalysisService);
+    }
 
         if (options.AutoCommit)
         {
