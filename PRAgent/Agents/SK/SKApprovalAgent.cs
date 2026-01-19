@@ -123,38 +123,40 @@ public class SKApprovalAgent
     }
 
     /// <summary>
-    /// GitHub操作関数を持つApprovalエージェントを作成します
+    /// バッファを使用してGitHub操作関数を持つApprovalエージェントを作成します
     /// </summary>
-    public async Task<ChatCompletionAgent> CreateAgentWithGitHubFunctionsAsync(
+    public async Task<ChatCompletionAgent> CreateAgentWithBufferAsync(
         string owner,
         string repo,
         int prNumber,
+        PRActionBuffer buffer,
         string? customSystemPrompt = null)
     {
-        var kernel = _agentFactory;
+        // プラグインインスタンスを作成
+        var approvePlugin = new ApprovePRFunction(buffer);
+        var commentPlugin = new PostCommentFunction(buffer);
 
-        // GitHub操作用のプラグインを作成
-        var approveFunction = new ApprovePRFunction(_gitHubService, owner, repo, prNumber);
-        var commentFunction = new PostCommentFunction(_gitHubService, owner, repo, prNumber);
+        // Kernelを作成してプラグインを登録
+        var kernel = _agentFactory.CreateApprovalKernel(owner, repo, prNumber, customSystemPrompt);
+        kernel.ImportPluginFromObject(approvePlugin);
+        kernel.ImportPluginFromObject(commentPlugin);
 
-        // 関数をKernelFunctionとして登録
-        var functions = new List<KernelFunction>
+        // エージェントを作成
+        var agent = new ChatCompletionAgent
         {
-            ApprovePRFunction.ApproveAsyncFunction(_gitHubService, owner, repo, prNumber),
-            ApprovePRFunction.GetApprovalStatusFunction(_gitHubService, owner, repo, prNumber),
-            PostCommentFunction.PostCommentAsyncFunction(_gitHubService, owner, repo, prNumber),
-            PostCommentFunction.PostReviewCommentAsyncFunction(_gitHubService, owner, repo, prNumber),
-            PostCommentFunction.PostLineCommentAsyncFunction(_gitHubService, owner, repo, prNumber)
+            Name = AgentDefinition.ApprovalAgent.Name,
+            Description = AgentDefinition.ApprovalAgent.Description,
+            Instructions = customSystemPrompt ?? AgentDefinition.ApprovalAgent.SystemPrompt,
+            Kernel = kernel
         };
 
-        return await _agentFactory.CreateApprovalAgentAsync(
-            owner, repo, prNumber, customSystemPrompt, functions);
+        return await Task.FromResult(agent);
     }
 
     /// <summary>
-    /// 関数呼び出し機能を持つApprovalエージェントを使用して決定を行います
+    /// バッファリングパターンを使用して決定を行い、完了後にアクションを一括実行します
     /// </summary>
-    public async Task<(bool ShouldApprove, string Reasoning, string? Comment)> DecideWithFunctionCallingAsync(
+    public async Task<(bool ShouldApprove, string Reasoning, string? Comment, PRActionResult? ActionResult)> DecideWithFunctionCallingAsync(
         string owner,
         string repo,
         int prNumber,
@@ -163,8 +165,11 @@ public class SKApprovalAgent
         bool autoApprove = false,
         CancellationToken cancellationToken = default)
     {
-        // GitHub関数を持つエージェントを作成
-        var agent = await CreateAgentWithGitHubFunctionsAsync(owner, repo, prNumber);
+        // バッファを作成
+        var buffer = new PRActionBuffer();
+
+        // バッファを使用したエージェントを作成
+        var agent = await CreateAgentWithBufferAsync(owner, repo, prNumber, buffer);
 
         // PR情報を取得
         var pr = await _gitHubService.GetPullRequestAsync(owner, repo, prNumber);
@@ -172,8 +177,8 @@ public class SKApprovalAgent
 
         // プロンプトを作成
         var autoApproveInstruction = autoApprove
-            ? "If the decision is to APPROVE, use the approve_pull_request function to actually approve the PR."
-            : "";
+            ? "If the decision is to APPROVE, use the approve_pull_request function to add approval to buffer."
+            : "If the decision is to APPROVE, clearly state DECISION: APPROVE in your response.";
 
         var prompt = $"""
             Based on the code review below, make an approval decision for this pull request.
@@ -190,30 +195,52 @@ public class SKApprovalAgent
 
             Your task:
             1. Analyze the review results against the approval threshold
-            2. Make a decision (APPROVE or REJECT)
+            2. Make a decision (APPROVE, CHANGES_REQUESTED, or COMMENT_ONLY)
             3. {autoApproveInstruction}
-            4. If there are specific concerns that need to be addressed, use post_pr_comment or post_line_comment
+            4. If the decision is CHANGES_REQUESTED, use the request_changes function to add changes requested to buffer.
+            5. If there are specific concerns that need to be addressed, use:
+               - post_pr_comment for general comments
+               - post_line_comment for specific line-level feedback
+               - post_review_comment for review-level comments
+
+            All actions will be buffered and executed after your analysis is complete.
 
             Provide your decision in this format:
 
-            DECISION: [APPROVE/REJECT]
+            DECISION: [APPROVE/CHANGES_REQUESTED/COMMENT_ONLY]
             REASONING: [Explain why, listing any issues above the threshold]
             CONDITIONS: [Any conditions for merge, or N/A]
             APPROVAL_COMMENT: [Brief comment if approved, or N/A]
 
-            Be conservative - when in doubt, reject or request additional review.
+            Be conservative - when in doubt, request changes or add comments.
             """;
 
         var chatHistory = new ChatHistory();
         chatHistory.AddUserMessage(prompt);
 
+        // エージェントを実行（関数呼び出しはバッファに追加される）
         var responses = new System.Text.StringBuilder();
         await foreach (var response in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
         {
             responses.Append(response.Message.Content);
         }
 
+        var responseText = responses.ToString();
+
         // レスポンスを解析
-        return ApprovalResponseParser.Parse(responses.ToString());
+        var (shouldApprove, reasoning, comment) = ApprovalResponseParser.Parse(responseText);
+
+        // バッファの内容を実行
+        PRActionResult? actionResult = null;
+        var executor = new PRActionExecutor(_gitHubService, owner, repo, prNumber);
+        var state = buffer.GetState();
+
+        if (state.LineCommentCount > 0 || state.ReviewCommentCount > 0 ||
+            state.HasGeneralComment || state.ApprovalState != PRApprovalState.None)
+        {
+            actionResult = await executor.ExecuteAsync(buffer, cancellationToken);
+        }
+
+        return (shouldApprove, reasoning, comment, actionResult);
     }
 }

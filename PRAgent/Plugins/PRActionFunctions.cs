@@ -79,13 +79,20 @@ public class PRActionFunctions
     public string GetBufferState()
     {
         var state = _buffer.GetState();
+        var approvalText = state.ApprovalState switch
+        {
+            PRApprovalState.Approved => "承認",
+            PRApprovalState.ChangesRequested => "変更依頼",
+            PRApprovalState.None => "なし",
+            _ => "なし"
+        };
         return $"""
             現在のバッファ状態:
             - 行コメント: {state.LineCommentCount}件
             - レビューコメント: {state.ReviewCommentCount}件
             - サマリー: {state.SummaryCount}件
             - 全体コメント: {(state.HasGeneralComment ? "あり" : "なし")}
-            - 承認フラグ: {(state.ShouldApprove ? "オン" : "オフ")}
+            - 承認ステータス: {approvalText}
             """;
     }
 
@@ -109,12 +116,20 @@ public class PRActionFunctions
         var state = _buffer.GetState();
         var totalActions = state.LineCommentCount + state.ReviewCommentCount + state.SummaryCount +
                           (state.HasGeneralComment ? 1 : 0) +
-                          (state.ShouldApprove ? 1 : 0);
+                          (state.ApprovalState != PRApprovalState.None ? 1 : 0);
 
         if (totalActions == 0)
         {
             return "コミットするアクションがありません。";
         }
+
+        var approvalText = state.ApprovalState switch
+        {
+            PRApprovalState.Approved => "承認",
+            PRApprovalState.ChangesRequested => "変更依頼",
+            PRApprovalState.None => "なし",
+            _ => "なし"
+        };
 
         return $"""
             {totalActions}件のアクションをコミット準備完了:
@@ -122,7 +137,7 @@ public class PRActionFunctions
             - レビューコメント: {state.ReviewCommentCount}件
             - サマリー: {state.SummaryCount}件
             - 全体コメント: {(state.HasGeneralComment ? "あり" : "なし")}
-            - 承認: {(state.ShouldApprove ? "あり" : "なし")}
+            - 承認ステータス: {approvalText}
 
             これらのアクションをGitHubに投稿します。
             """;

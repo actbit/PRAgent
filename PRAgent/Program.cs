@@ -87,11 +87,8 @@ internal class Program
                     // Data Services
                     services.AddSingleton<PullRequestDataService>();
 
-                    // Agents (現在稼働中)
+                    // Detailed Comment Agent
                     services.AddSingleton<IDetailedCommentAgent, DetailedCommentAgent>();
-                    services.AddSingleton<ReviewAgent>();
-                    services.AddSingleton<ApprovalAgent>();
-                    services.AddSingleton<SummaryAgent>();
 
                     // SK Agents (Semantic Kernel Agent Framework)
                     services.AddSingleton<PRAgentFactory>();
@@ -99,17 +96,9 @@ internal class Program
                     services.AddSingleton<SKSummaryAgent>();
                     services.AddSingleton<SKApprovalAgent>();
 
-                    // Agent Orchestrator - AgentFramework設定に応じて切り替え
-                    if (prAgentConfig.AgentFramework?.Enabled == true)
-                    {
-                        services.AddSingleton<IAgentOrchestratorService, SKAgentOrchestratorService>();
-                        Log.Information("Using SKAgentOrchestratorService (Agent Framework enabled)");
-                    }
-                    else
-                    {
-                        services.AddSingleton<IAgentOrchestratorService, AgentOrchestratorService>();
-                        Log.Information("Using AgentOrchestratorService (standard mode)");
-                    }
+                    // Agent Orchestrator - SKAgentOrchestratorServiceを使用
+                    services.AddSingleton<IAgentOrchestratorService, SKAgentOrchestratorService>();
+                    Log.Information("Using SKAgentOrchestratorService (Agent Framework)");
 
                     // PR Analysis Service
                     services.AddSingleton<IPRAnalysisService, PRAnalysisService>();

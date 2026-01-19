@@ -81,21 +81,39 @@ public class PRActionExecutor
                 result.GeneralCommentUrl = commentResult.HtmlUrl;
             }
 
-            // 4. 承認を実行
-            if (buffer.ShouldApprove)
+            // 4. 承認ステータスに応じた処理を実行
+            switch (buffer.ApprovalState)
             {
-                var approvalResult = await _gitHubService.ApprovePullRequestAsync(
-                    _owner, _repo, _prNumber, buffer.ApprovalComment);
+                case PRApprovalState.Approved:
+                    var approvalResult = await _gitHubService.ApprovePullRequestAsync(
+                        _owner, _repo, _prNumber, buffer.ApprovalComment);
 
-                result.Approved = true;
-                result.ApprovalUrl = approvalResult.HtmlUrl;
+                    result.Approved = true;
+                    result.ApprovalState = PRApprovalState.Approved;
+                    result.ApprovalUrl = approvalResult.HtmlUrl;
+                    break;
+
+                case PRApprovalState.ChangesRequested:
+                    // 変更依頼をレビューコメントとして投稿
+                    var changesComment = $"## Changes Requested\n\n{buffer.ApprovalComment ?? "Please address the issues mentioned in the review."}";
+                    await _gitHubService.CreateReviewCommentAsync(
+                        _owner, _repo, _prNumber, changesComment);
+
+                    result.ApprovalState = PRApprovalState.ChangesRequested;
+                    result.ChangesRequested = true;
+                    break;
+
+                case PRApprovalState.None:
+                    // 何もしない（コメントのみ）
+                    break;
             }
 
             result.TotalActionsPosted =
                 result.LineCommentsPosted +
                 result.SummariesPosted +
                 (result.GeneralCommentPosted ? 1 : 0) +
-                (result.Approved ? 1 : 0);
+                (result.Approved ? 1 : 0) +
+                (result.ChangesRequested ? 1 : 0);
 
             result.Message = $"Successfully posted {result.TotalActionsPosted} action(s) to PR #{_prNumber}";
         }
@@ -147,15 +165,26 @@ public class PRActionExecutor
             preview += $"### 全体コメント\n{buffer.GeneralComment.Substring(0, Math.Min(200, buffer.GeneralComment.Length))}...\n\n";
         }
 
-        if (buffer.ShouldApprove)
+        // 承認ステータスに応じた表示
+        switch (buffer.ApprovalState)
         {
-            preview += $"### 承認\nはい - {buffer.ApprovalComment ?? "コメントなし"}\n\n";
+            case PRApprovalState.Approved:
+                preview += $"### 承認\nはい - {buffer.ApprovalComment ?? "コメントなし"}\n\n";
+                break;
+
+            case PRApprovalState.ChangesRequested:
+                preview += $"### 変更依頼\nはい - {buffer.ApprovalComment ?? "コメントなし"}\n\n";
+                break;
+
+            case PRApprovalState.None:
+                // 何も表示しない（コメントのみ）
+                break;
         }
 
         var totalActions = buffer.LineComments.Count +
                           buffer.Summaries.Count +
                           (string.IsNullOrEmpty(buffer.GeneralComment) ? 0 : 1) +
-                          (buffer.ShouldApprove ? 1 : 0);
+                          (buffer.ApprovalState != PRApprovalState.None ? 1 : 0);
 
         preview += $"**合計: {totalActions}件のアクション**";
 
@@ -177,6 +206,8 @@ public class PRActionResult
     public int SummariesPosted { get; set; }
     public bool GeneralCommentPosted { get; set; }
     public bool Approved { get; set; }
+    public bool ChangesRequested { get; set; }
+    public PRApprovalState? ApprovalState { get; set; }
     public string? SummaryCommentUrl { get; set; }
     public string? GeneralCommentUrl { get; set; }
     public string? ApprovalUrl { get; set; }

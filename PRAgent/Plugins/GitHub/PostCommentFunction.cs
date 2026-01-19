@@ -1,74 +1,51 @@
 using Microsoft.SemanticKernel;
-using Octokit;
-using PRAgent.Services;
+using PRAgent.Models;
 
 namespace PRAgent.Plugins.GitHub;
 
 /// <summary>
-/// Semantic Kernel用のプルリクエストコメント投稿機能プラグイン
+/// Semantic Kernel用のプルリクエストコメント投稿機能プラグイン（バッファリング版）
 /// </summary>
 public class PostCommentFunction
 {
-    private readonly IGitHubService _gitHubService;
-    private readonly string _owner;
-    private readonly string _repo;
-    private readonly int _prNumber;
+    private readonly PRActionBuffer _buffer;
 
-    public PostCommentFunction(
-        IGitHubService gitHubService,
-        string owner,
-        string repo,
-        int prNumber)
+    public PostCommentFunction(PRActionBuffer buffer)
     {
-        _gitHubService = gitHubService;
-        _owner = owner;
-        _repo = repo;
-        _prNumber = prNumber;
+        _buffer = buffer;
     }
 
     /// <summary>
-    /// プルリクエストに全体コメントを投稿します
+    /// プルリクエストに全体コメントを追加します（バッファに追加）
     /// </summary>
     /// <param name="comment">コメント内容</param>
-    /// <param name="cancellationToken">キャンセレーショントークン</param>
-    /// <returns>投稿結果のメッセージ</returns>
+    /// <returns>コメントがバッファに追加されたことを示すメッセージ</returns>
     [KernelFunction("post_pr_comment")]
-    public async Task<string> PostCommentAsync(
-        string comment,
-        CancellationToken cancellationToken = default)
+    public string PostCommentAsync(string comment)
     {
         if (string.IsNullOrWhiteSpace(comment))
         {
             return "Error: Comment cannot be empty";
         }
 
-        try
-        {
-            var result = await _gitHubService.CreateIssueCommentAsync(_owner, _repo, _prNumber, comment);
-            return $"Comment posted successfully to PR #{_prNumber}. Comment ID: {result.Id}";
-        }
-        catch (Exception ex)
-        {
-            return $"Failed to post comment to PR #{_prNumber}: {ex.Message}";
-        }
+        _buffer.SetGeneralComment(comment);
+        return $"General comment has been added to buffer. Length: {comment.Length} characters";
     }
 
     /// <summary>
-    /// プルリクエストの特定の行にコメントを投稿します
+    /// プルリクエストの特定の行にコメントを追加します（バッファに追加）
     /// </summary>
     /// <param name="filePath">ファイルパス</param>
     /// <param name="lineNumber">行番号</param>
     /// <param name="comment">コメント内容</param>
     /// <param name="suggestion">提案される変更内容（オプション）</param>
-    /// <param name="cancellationToken">キャンセレーショントークン</param>
-    /// <returns>投稿結果のメッセージ</returns>
+    /// <returns>行コメントがバッファに追加されたことを示すメッセージ</returns>
     [KernelFunction("post_line_comment")]
-    public async Task<string> PostLineCommentAsync(
+    public string PostLineCommentAsync(
         string filePath,
         int lineNumber,
         string comment,
-        string? suggestion = null,
-        CancellationToken cancellationToken = default)
+        string? suggestion = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -80,104 +57,42 @@ public class PostCommentFunction
             return "Error: Comment cannot be empty";
         }
 
-        try
-        {
-            var result = await _gitHubService.CreateLineCommentAsync(
-                _owner, _repo, _prNumber, filePath, lineNumber, comment, suggestion);
-            return $"Line comment posted successfully to {filePath}:{lineNumber} in PR #{_prNumber}";
-        }
-        catch (Exception ex)
-        {
-            return $"Failed to post line comment to PR #{_prNumber}: {ex.Message}";
-        }
+        _buffer.AddLineComment(filePath, lineNumber, comment, suggestion);
+        return $"Line comment has been added to buffer for {filePath}:{lineNumber}";
     }
 
     /// <summary>
-    /// 複数の行コメントを一度に投稿します
-    /// </summary>
-    /// <param name="comments">コメントリスト（ファイルパス、行番号、コメント、提案）</param>
-    /// <param name="cancellationToken">キャンセレーショントークン</param>
-    /// <returns>投稿結果のメッセージ</returns>
-    [KernelFunction("post_multiple_line_comments")]
-    public async Task<string> PostMultipleLineCommentsAsync(
-        string commentsJson,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(commentsJson))
-        {
-            return "Error: Comments data cannot be empty";
-        }
-
-        try
-        {
-            // JSON形式のコメントデータをパース
-            var comments = System.Text.Json.JsonSerializer.Deserialize<List<(string FilePath, int LineNumber, string Comment, string? Suggestion)>>(
-                commentsJson,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-            if (comments == null || comments.Count == 0)
-            {
-                return "Error: No valid comments found in the provided data";
-            }
-
-            var result = await _gitHubService.CreateMultipleLineCommentsAsync(_owner, _repo, _prNumber, comments);
-            return $"Successfully posted {comments.Count} line comments to PR #{_prNumber}";
-        }
-        catch (Exception ex)
-        {
-            return $"Failed to post multiple line comments to PR #{_prNumber}: {ex.Message}";
-        }
-    }
-
-    /// <summary>
-    /// レビューコメントとして投稿します
+    /// レビューコメントを追加します（バッファに追加）
     /// </summary>
     /// <param name="reviewBody">レビュー本文</param>
-    /// <param name="cancellationToken">キャンセレーショントークン</param>
-    /// <returns>投稿結果のメッセージ</returns>
+    /// <returns>レビューコメントがバッファに追加されたことを示すメッセージ</returns>
     [KernelFunction("post_review_comment")]
-    public async Task<string> PostReviewCommentAsync(
-        string reviewBody,
-        CancellationToken cancellationToken = default)
+    public string PostReviewCommentAsync(string reviewBody)
     {
         if (string.IsNullOrWhiteSpace(reviewBody))
         {
             return "Error: Review body cannot be empty";
         }
 
-        try
-        {
-            var result = await _gitHubService.CreateReviewCommentAsync(_owner, _repo, _prNumber, reviewBody);
-            return $"Review comment posted successfully to PR #{_prNumber}. Review ID: {result.Id}";
-        }
-        catch (Exception ex)
-        {
-            return $"Failed to post review comment to PR #{_prNumber}: {ex.Message}";
-        }
+        _buffer.AddReviewComment(reviewBody);
+        return $"Review comment has been added to buffer. Length: {reviewBody.Length} characters";
     }
 
     /// <summary>
     /// KernelFunctionとして使用するためのファクトリメソッド（PRコメント）
     /// </summary>
-    public static KernelFunction PostCommentAsyncFunction(
-        IGitHubService gitHubService,
-        string owner,
-        string repo,
-        int prNumber)
+    public static KernelFunction PostCommentAsyncFunction(PRActionBuffer buffer)
     {
-        var functionPlugin = new PostCommentFunction(gitHubService, owner, repo, prNumber);
+        var functionPlugin = new PostCommentFunction(buffer);
         return KernelFunctionFactory.CreateFromMethod(
-            (string comment, CancellationToken ct) => functionPlugin.PostCommentAsync(comment, ct),
+            (string comment) => functionPlugin.PostCommentAsync(comment),
             functionName: "post_pr_comment",
-            description: "Posts a general comment to a pull request",
+            description: "Adds a general comment to the buffer for posting to a pull request",
             parameters: new[]
             {
                 new KernelParameterMetadata("comment")
                 {
-                    Description = "The comment content to post",
+                    Description = "The comment content to add to buffer",
                     IsRequired = true
                 }
             });
@@ -186,18 +101,14 @@ public class PostCommentFunction
     /// <summary>
     /// KernelFunctionとして使用するためのファクトリメソッド（行コメント）
     /// </summary>
-    public static KernelFunction PostLineCommentAsyncFunction(
-        IGitHubService gitHubService,
-        string owner,
-        string repo,
-        int prNumber)
+    public static KernelFunction PostLineCommentAsyncFunction(PRActionBuffer buffer)
     {
-        var functionPlugin = new PostCommentFunction(gitHubService, owner, repo, prNumber);
+        var functionPlugin = new PostCommentFunction(buffer);
         return KernelFunctionFactory.CreateFromMethod(
-            (string filePath, int lineNumber, string comment, string? suggestion, CancellationToken ct) =>
-                functionPlugin.PostLineCommentAsync(filePath, lineNumber, comment, suggestion, ct),
+            (string filePath, int lineNumber, string comment, string? suggestion) =>
+                functionPlugin.PostLineCommentAsync(filePath, lineNumber, comment, suggestion),
             functionName: "post_line_comment",
-            description: "Posts a comment on a specific line in a pull request file",
+            description: "Adds a line comment to the buffer for posting to a specific line in a pull request file",
             parameters: new[]
             {
                 new KernelParameterMetadata("filePath")
@@ -227,22 +138,18 @@ public class PostCommentFunction
     /// <summary>
     /// KernelFunctionとして使用するためのファクトリメソッド（レビューコメント）
     /// </summary>
-    public static KernelFunction PostReviewCommentAsyncFunction(
-        IGitHubService gitHubService,
-        string owner,
-        string repo,
-        int prNumber)
+    public static KernelFunction PostReviewCommentAsyncFunction(PRActionBuffer buffer)
     {
-        var functionPlugin = new PostCommentFunction(gitHubService, owner, repo, prNumber);
+        var functionPlugin = new PostCommentFunction(buffer);
         return KernelFunctionFactory.CreateFromMethod(
-            (string reviewBody, CancellationToken ct) => functionPlugin.PostReviewCommentAsync(reviewBody, ct),
+            (string reviewBody) => functionPlugin.PostReviewCommentAsync(reviewBody),
             functionName: "post_review_comment",
-            description: "Posts a review comment to a pull request",
+            description: "Adds a review comment to the buffer for posting to a pull request",
             parameters: new[]
             {
                 new KernelParameterMetadata("reviewBody")
                 {
-                    Description = "The review content to post",
+                    Description = "The review content to add to buffer",
                     IsRequired = true
                 }
             });

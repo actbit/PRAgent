@@ -45,11 +45,11 @@ public class ConfigurationService : IConfigurationService
             IgnorePaths = _configuration.GetSection("PRAgent:IgnorePaths").Get<List<string>>() ?? GetDefaultIgnorePaths(),
             AgentFramework = new AgentFrameworkConfig
             {
-                Enabled = _configuration.GetValue<bool>("PRAgent:AgentFramework:Enabled", false),
+                Enabled = _configuration.GetValue<bool>("PRAgent:AgentFramework:Enabled", true),
                 OrchestrationMode = _configuration.GetValue<string>("PRAgent:AgentFramework:OrchestrationMode", "sequential") ?? "sequential",
                 SelectionStrategy = _configuration.GetValue<string>("PRAgent:AgentFramework:SelectionStrategy", "approval_workflow") ?? "approval_workflow",
                 EnableFunctionCalling = _configuration.GetValue<bool>("PRAgent:AgentFramework:EnableFunctionCalling", true),
-                EnableAutoApproval = _configuration.GetValue<bool>("PRAgent:AgentFramework:EnableAutoApproval", false),
+                EnableAutoApproval = _configuration.GetValue<bool>("PRAgent:AgentFramework:EnableAutoApproval", true),
                 MaxTurns = _configuration.GetValue<int>("PRAgent:AgentFramework:MaxTurns", 10)
             }
         };

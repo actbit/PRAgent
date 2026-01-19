@@ -75,14 +75,36 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         // ワークフロー: ReviewAgent → ApprovalAgent
         var review = await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken: cancellationToken);
 
-        var (shouldApprove, reasoning, comment) = await _approvalAgent.DecideAsync(
-            owner, repo, prNumber, review, threshold, cancellationToken);
+        // FunctionCalling設定に応じてメソッドを選択
+        var useFunctionCalling = _config.AgentFramework?.EnableFunctionCalling ?? false;
+        var autoApprove = _config.AgentFramework?.EnableAutoApproval ?? false;
 
+        bool shouldApprove;
+        string reasoning;
+        string? comment;
         string? approvalUrl = null;
-        if (shouldApprove)
+
+        if (useFunctionCalling)
         {
-            var result = await _approvalAgent.ApproveAsync(owner, repo, prNumber, comment);
-            approvalUrl = result;
+            // FunctionCalling使用 - PRActionResultが返される
+            var (_, reasoningFc, commentFc, actionResult) = await _approvalAgent.DecideWithFunctionCallingAsync(
+                owner, repo, prNumber, review, threshold, autoApprove, cancellationToken);
+            shouldApprove = actionResult?.Approved ?? false;
+            reasoning = reasoningFc;
+            comment = commentFc;
+            approvalUrl = actionResult?.ApprovalUrl;
+        }
+        else
+        {
+            // FunctionCalling不使用
+            (shouldApprove, reasoning, comment) = await _approvalAgent.DecideAsync(
+                owner, repo, prNumber, review, threshold, cancellationToken);
+
+            if (shouldApprove)
+            {
+                var result = await _approvalAgent.ApproveAsync(owner, repo, prNumber, comment);
+                approvalUrl = result;
+            }
         }
 
         return new ApprovalResult
@@ -120,8 +142,8 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         string owner,
         string repo,
         int prNumber,
-        ApprovalThreshold threshold,
         string language,
+        ApprovalThreshold threshold = ApprovalThreshold.Minor,
         CancellationToken cancellationToken = default)
     {
         // languageパラメータは現在のSK実装では使用しない
@@ -171,8 +193,8 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         string owner,
         string repo,
         int prNumber,
-        ApprovalThreshold threshold,
         string workflow,
+        ApprovalThreshold threshold = ApprovalThreshold.Minor,
         CancellationToken cancellationToken = default)
     {
         return workflow.ToLower() switch
@@ -295,51 +317,5 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
             Comment = comment,
             ApprovalUrl = approvalUrl
         };
-    }
-
-    /// <summary>
-    /// 関数呼び出し機能を持つApprovalエージェントを作成
-    /// </summary>
-    private async Task<ChatCompletionAgent> CreateApprovalAgentWithFunctionsAsync(
-        string owner, string repo, int prNumber)
-    {
-        // 設定を反映したカスタムプロンプトを作成
-        var customPrompt = _config.AgentFramework?.Agents?.Approval?.CustomSystemPrompt;
-
-        // GitHub操作用のプラグインを作成
-        var approveFunction = new ApprovePRFunction(_gitHubService, owner, repo, prNumber);
-        var commentFunction = new PostCommentFunction(_gitHubService, owner, repo, prNumber);
-
-        // 関数をKernelFunctionとして登録
-        var functions = new List<KernelFunction>
-        {
-            ApprovePRFunction.ApproveAsyncFunction(_gitHubService, owner, repo, prNumber),
-            ApprovePRFunction.GetApprovalStatusFunction(_gitHubService, owner, repo, prNumber),
-            PostCommentFunction.PostCommentAsyncFunction(_gitHubService, owner, repo, prNumber),
-            PostCommentFunction.PostLineCommentAsyncFunction(_gitHubService, owner, repo, prNumber)
-        };
-
-        return await _agentFactory.CreateApprovalAgentAsync(
-            owner, repo, prNumber, customPrompt, functions);
-    }
-
-    /// <summary>
-    /// 設定を反映したReviewエージェントを作成
-    /// </summary>
-    private async Task<ChatCompletionAgent> CreateConfiguredReviewAgentAsync(
-        string owner, string repo, int prNumber)
-    {
-        var customPrompt = _config.AgentFramework?.Agents?.Review?.CustomSystemPrompt;
-        return await _agentFactory.CreateReviewAgentAsync(owner, repo, prNumber, customPrompt);
-    }
-
-    /// <summary>
-    /// 設定を反映したSummaryエージェントを作成
-    /// </summary>
-    private async Task<ChatCompletionAgent> CreateConfiguredSummaryAgentAsync(
-        string owner, string repo, int prNumber)
-    {
-        var customPrompt = _config.AgentFramework?.Agents?.Summary?.CustomSystemPrompt;
-        return await _agentFactory.CreateSummaryAgentAsync(owner, repo, prNumber, customPrompt);
     }
 }

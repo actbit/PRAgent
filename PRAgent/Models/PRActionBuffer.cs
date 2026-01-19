@@ -10,7 +10,7 @@ public class PRActionBuffer
     private readonly List<ReviewCommentAction> _reviewComments = new();
     private readonly List<string> _summaries = new();
     private string? _generalComment;
-    private bool _shouldApprove;
+    private PRApprovalState _approvalState = PRApprovalState.None;
     private string? _approvalComment;
 
     /// <summary>
@@ -55,11 +55,20 @@ public class PRActionBuffer
     }
 
     /// <summary>
-    /// 承認をマークします
+    /// PRを承認します
     /// </summary>
     public void MarkForApproval(string? comment = null)
     {
-        _shouldApprove = true;
+        _approvalState = PRApprovalState.Approved;
+        _approvalComment = comment;
+    }
+
+    /// <summary>
+    /// 変更を依頼します
+    /// </summary>
+    public void MarkForChangesRequested(string? comment = null)
+    {
+        _approvalState = PRApprovalState.ChangesRequested;
         _approvalComment = comment;
     }
 
@@ -72,7 +81,7 @@ public class PRActionBuffer
         _reviewComments.Clear();
         _summaries.Clear();
         _generalComment = null;
-        _shouldApprove = false;
+        _approvalState = PRApprovalState.None;
         _approvalComment = null;
     }
 
@@ -87,7 +96,7 @@ public class PRActionBuffer
             ReviewCommentCount = _reviewComments.Count,
             SummaryCount = _summaries.Count,
             HasGeneralComment = !string.IsNullOrEmpty(_generalComment),
-            ShouldApprove = _shouldApprove
+            ApprovalState = _approvalState
         };
     }
 
@@ -98,8 +107,21 @@ public class PRActionBuffer
     public IReadOnlyList<ReviewCommentAction> ReviewComments => _reviewComments.AsReadOnly();
     public IReadOnlyList<string> Summaries => _summaries.AsReadOnly();
     public string? GeneralComment => _generalComment;
-    public bool ShouldApprove => _shouldApprove;
+    public PRApprovalState ApprovalState => _approvalState;
     public string? ApprovalComment => _approvalComment;
+}
+
+/// <summary>
+/// PR承認ステータス
+/// </summary>
+public enum PRApprovalState
+{
+    /// <summary>なし（コメントのみ）</summary>
+    None,
+    /// <summary>承認</summary>
+    Approved,
+    /// <summary>変更依頼</summary>
+    ChangesRequested
 }
 
 /// <summary>
@@ -130,5 +152,5 @@ public class PRActionState
     public int ReviewCommentCount { get; init; }
     public int SummaryCount { get; init; }
     public bool HasGeneralComment { get; init; }
-    public bool ShouldApprove { get; init; }
+    public PRApprovalState ApprovalState { get; init; }
 }

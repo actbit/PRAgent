@@ -96,7 +96,7 @@ public class PRAgentFactory
         string? customSystemPrompt = null,
         IEnumerable<KernelFunction>? functions = null)
     {
-        var kernel = _kernelService.CreateAgentKernel(AgentDefinition.ApprovalAgent.SystemPrompt);
+        var kernel = CreateApprovalKernel(owner, repo, prNumber, customSystemPrompt);
 
         // GitHub操作用のプラグインを登録
         if (functions != null)
@@ -119,11 +119,26 @@ public class PRAgentFactory
                 ["approval_mode"] = true,
                 ["owner"] = owner,
                 ["repo"] = repo,
-                ["pr_number"] = prNumber
+                ["pr_number"] = prNumber,
+                // FunctionCallingを自動的に有効にする
+                ["function_choice_behavior"] = "auto"
             }
         };
 
         return await Task.FromResult(agent);
+    }
+
+    /// <summary>
+    /// Approvalエージェント用のKernelを作成
+    /// </summary>
+    public Kernel CreateApprovalKernel(
+        string owner,
+        string repo,
+        int prNumber,
+        string? customSystemPrompt = null)
+    {
+        return _kernelService.CreateAgentKernel(
+            customSystemPrompt ?? AgentDefinition.ApprovalAgent.SystemPrompt);
     }
 
     /// <summary>

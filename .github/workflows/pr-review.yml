@@ -38,6 +38,7 @@ jobs:
             --owner "${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}" \
             --repo "${{ github.event.pull_request.head.repo.name || github.event.repository.name }}" \
             --pr "${{ github.event.pull_request.number }}" \
+            --language ja \
             --post-comment
         env:
           AISettings__Endpoint: ${{ vars.AI_ENDPOINT || 'https://api.openai.com/v1' }}
