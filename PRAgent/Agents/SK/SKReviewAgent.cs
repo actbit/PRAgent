@@ -131,13 +131,20 @@ public class SKReviewAgent
         var kernel = _agentFactory.CreateApprovalKernel(owner, repo, prNumber, systemPrompt);
         kernel.ImportPluginFromObject(commentPlugin);
 
-        // エージェントを作成
+        // OpenAI用の実行設定でFunctionCallingを有効化
+        var executionSettings = new OpenAIPromptExecutionSettings
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+        };
+
+        // エージェントを作成（ArgumentsでFunctionCallingを有効化）
         var agent = new ChatCompletionAgent
         {
             Name = AgentDefinition.ReviewAgent.Name,
             Description = AgentDefinition.ReviewAgent.Description,
             Instructions = systemPrompt,
-            Kernel = kernel
+            Kernel = kernel,
+            Arguments = new KernelArguments(executionSettings)
         };
 
         // PRデータを取得
@@ -171,45 +178,12 @@ public class SKReviewAgent
         var chatHistory = new ChatHistory();
         chatHistory.AddUserMessage(prompt);
 
-        // FunctionCallingを有効にするために、Kernelから直接サービスを呼び出し
-        var chatService = kernel.GetRequiredService<IChatCompletionService>();
-
-        // OpenAI用の実行設定でFunctionCallingを有効化
-        var executionSettings = new OpenAIPromptExecutionSettings
-        {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-        };
-
         var responses = new System.Text.StringBuilder();
 
-        // 関数呼び出しを含む可能性があるため、複数回の反復処理を行う
-        var maxIterations = 15;
-        var iteration = 0;
-
-        while (iteration < maxIterations)
+        // エージェントを実行（Function Callingは自動的に処理される）
+        await foreach (var response in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
         {
-            iteration++;
-
-            var contents = await chatService.GetChatMessageContentsAsync(
-                chatHistory,
-                executionSettings,
-                kernel,
-                cancellationToken);
-
-            var content = contents.FirstOrDefault();
-            if (content == null) break;
-
-            var currentResponse = content.Content ?? string.Empty;
-            responses.Append(currentResponse);
-            chatHistory.AddAssistantMessage(currentResponse);
-
-            // 関数呼び出しが行われたかチェック
-            var hasFunctionCalls = content.Items?.Any(i => i is FunctionCallContent) == true;
-
-            if (!hasFunctionCalls)
-            {
-                break;
-            }
+            responses.Append(response.Message.Content);
         }
 
         var reviewText = responses.ToString();
