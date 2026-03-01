@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Octokit;
 using PRAgent.Models;
 
@@ -13,6 +14,74 @@ public class GitHubService : IGitHubService
         {
             Credentials = new Credentials(gitHubToken)
         };
+    }
+
+    /// <summary>
+    /// ファイルのdiffから行番号に対応するdiff positionを計算します
+    /// </summary>
+    /// <param name="patch">ファイルのdiffパッチ</param>
+    /// <param="lineNumber">ファイル内の行番号（1ベース）</param>
+    /// <returns>diff position（1ベース）、見つからない場合はnull</returns>
+    private static int? CalculateDiffPosition(string? patch, int lineNumber)
+    {
+        if (string.IsNullOrEmpty(patch))
+            return null;
+
+        var lines = patch.Split('\n');
+        int position = 0;
+        int currentNewLine = 0;
+
+        foreach (var line in lines)
+        {
+            position++;
+
+            // Hunk headerを解析: @@ -start_old,count +start_new,count @@ heading
+            var hunkMatch = Regex.Match(line, @"^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@");
+            if (hunkMatch.Success)
+            {
+                // 開始行番号の1つ前に設定（次の行でインクリメントして正しい行番号になるように）
+                currentNewLine = int.Parse(hunkMatch.Groups[1].Value) - 1;
+                continue;
+            }
+
+            // 行のタイプを判定
+            if (line.StartsWith("+"))
+            {
+                // 追加行: 新しいファイルの行番号が増える
+                currentNewLine++;
+                if (currentNewLine == lineNumber)
+                {
+                    return position;
+                }
+            }
+            else if (line.StartsWith("-"))
+            {
+                // 削除行: 新しいファイルの行番号は変わらない
+                // 削除行にはコメントできないのでスキップ
+            }
+            else if (line.StartsWith(" ") || line == "")
+            {
+                // コンテキスト行または空行
+                currentNewLine++;
+                if (currentNewLine == lineNumber)
+                {
+                    return position;
+                }
+            }
+            // \ No newline at end of file などのメタ行はスキップ
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// PRのファイルのdiffを取得します
+    /// </summary>
+    private async Task<string?> GetFilePatchAsync(string owner, string repo, int prNumber, string filePath)
+    {
+        var files = await _client.PullRequest.Files(owner, repo, prNumber);
+        var file = files.FirstOrDefault(f => f.FileName == filePath);
+        return file?.Patch;
     }
 
     public async Task<PullRequest> GetPullRequestAsync(string owner, string repo, int prNumber)
@@ -158,6 +227,15 @@ public class GitHubService : IGitHubService
         // 行コメントを作成
         var commentBody = suggestion != null ? $"{comment}\n```suggestion\n{suggestion}\n```" : comment;
 
+        // diffを取得してpositionを計算
+        var patch = await GetFilePatchAsync(owner, repo, prNumber, filePath);
+        var position = CalculateDiffPosition(patch, lineNumber);
+
+        if (!position.HasValue)
+        {
+            throw new ArgumentException($"Could not find line {lineNumber} in diff for file {filePath}. The line may not be part of the changes.");
+        }
+
         return await _client.PullRequest.Review.Create(
             owner,
             repo,
@@ -167,7 +245,7 @@ public class GitHubService : IGitHubService
                 Event = PullRequestReviewEvent.Comment,
                 Comments = new List<DraftPullRequestReviewComment>
                 {
-                    new DraftPullRequestReviewComment(commentBody, filePath, lineNumber)
+                    new DraftPullRequestReviewComment(commentBody, filePath, position.Value)
                 }
             }
         );
@@ -175,25 +253,53 @@ public class GitHubService : IGitHubService
 
     public async Task<PullRequestReview> CreateMultipleLineCommentsAsync(string owner, string repo, int prNumber, List<(string FilePath, int? LineNumber, int? StartLine, int? EndLine, string Comment, string? Suggestion)> comments)
     {
-        var draftComments = comments.Select(c =>
+        // ファイルごとのdiffをキャッシュ
+        var patchCache = new Dictionary<string, string?>();
+
+        var draftComments = new List<DraftPullRequestReviewComment>();
+        var errors = new List<string>();
+
+        foreach (var c in comments)
         {
             var commentBody = c.Suggestion != null ? $"{c.Comment}\n```suggestion\n{c.Suggestion}\n```" : c.Comment;
 
-            // 1行コメントのみ対応（LineNumberがある場合）
+            int targetLine;
             if (c.LineNumber.HasValue)
             {
-                return new DraftPullRequestReviewComment(commentBody, c.FilePath, c.LineNumber.Value);
+                targetLine = c.LineNumber.Value;
             }
-            // 範囲コメントは1行目を使用
             else if (c.StartLine.HasValue)
             {
-                return new DraftPullRequestReviewComment(commentBody, c.FilePath, c.StartLine.Value);
+                targetLine = c.StartLine.Value;
             }
             else
             {
-                throw new ArgumentException($"Comment must have either LineNumber or StartLine: {c.FilePath}");
+                errors.Add($"Comment must have either LineNumber or StartLine: {c.FilePath}");
+                continue;
             }
-        }).ToList();
+
+            // diffを取得（キャッシュを使用）
+            if (!patchCache.TryGetValue(c.FilePath, out var patch))
+            {
+                patch = await GetFilePatchAsync(owner, repo, prNumber, c.FilePath);
+                patchCache[c.FilePath] = patch;
+            }
+
+            // positionを計算
+            var position = CalculateDiffPosition(patch, targetLine);
+            if (!position.HasValue)
+            {
+                errors.Add($"Could not find line {targetLine} in diff for file {c.FilePath}");
+                continue;
+            }
+
+            draftComments.Add(new DraftPullRequestReviewComment(commentBody, c.FilePath, position.Value));
+        }
+
+        if (errors.Count > 0 && draftComments.Count == 0)
+        {
+            throw new ArgumentException($"Failed to create any comments: {string.Join("; ", errors)}");
+        }
 
         return await _client.PullRequest.Review.Create(
             owner,
