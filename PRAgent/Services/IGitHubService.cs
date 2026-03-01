@@ -16,4 +16,15 @@ public interface IGitHubService
     Task<PullRequestReview> ApprovePullRequestAsync(string owner, string repo, int prNumber, string? comment = null);
     Task<string?> GetRepositoryFileContentAsync(string owner, string repo, string path, string? branch = null);
     Task<bool> FileExistsAsync(string owner, string repo, string path, string? branch = null);
+
+    /// <summary>
+    /// レビュー本文、行コメント、承認ステータスをまとめて1つのReviewとして投稿します
+    /// </summary>
+    Task<PullRequestReview> CreateCompleteReviewAsync(
+        string owner,
+        string repo,
+        int prNumber,
+        string? reviewBody,
+        List<DraftPullRequestReviewComment> comments,
+        bool approve = false);
 }

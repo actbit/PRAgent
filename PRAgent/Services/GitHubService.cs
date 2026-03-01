@@ -59,9 +59,10 @@ public class GitHubService : IGitHubService
                 // 削除行: 新しいファイルの行番号は変わらない
                 // 削除行にはコメントできないのでスキップ
             }
-            else if (line.StartsWith(" ") || line == "")
+            else if (line.StartsWith(" ") || (line.Length == 0 && position < lines.Length))
             {
-                // コンテキスト行または空行
+                // コンテキスト行
+                // 空行はdiffの最後のアーティファクト（Splitの結果）を除く
                 currentNewLine++;
                 if (currentNewLine == lineNumber)
                 {
@@ -160,18 +161,24 @@ public class GitHubService : IGitHubService
     }
 
     /// <summary>
-    /// レビュー本文と詳細コメントをまとめて投稿
+    /// レビュー本文、行コメント、承認ステータスをまとめて1つのReviewとして投稿します
     /// </summary>
-    public async Task CreateCompleteReviewAsync(string owner, string repo, int prNumber, string reviewBody, List<DraftPullRequestReviewComment> comments)
+    public async Task<PullRequestReview> CreateCompleteReviewAsync(
+        string owner,
+        string repo,
+        int prNumber,
+        string? reviewBody,
+        List<DraftPullRequestReviewComment> comments,
+        bool approve = false)
     {
         var review = new PullRequestReviewCreate()
         {
-            Body = reviewBody,
-            Event = PullRequestReviewEvent.Comment,
+            Body = reviewBody ?? string.Empty,
+            Event = approve ? PullRequestReviewEvent.Approve : PullRequestReviewEvent.Comment,
             Comments = comments
         };
 
-        await _client.PullRequest.Review.Create(owner, repo, prNumber, review);
+        return await _client.PullRequest.Review.Create(owner, repo, prNumber, review);
     }
 
     public async Task<IssueComment> CreateIssueCommentAsync(string owner, string repo, int prNumber, string body)

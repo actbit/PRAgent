@@ -36,7 +36,7 @@ public class PostCommentFunction
     /// プルリクエストの特定の行にコメントを追加します（バッファに追加）
     /// </summary>
     /// <param name="filePath">ファイルパス</param>
-    /// <param name="lineNumber">行番号</param>
+    /// <param name="lineNumber">行番号（1以上）</param>
     /// <param name="comment">コメント内容</param>
     /// <param name="suggestion">提案される変更内容（オプション）</param>
     /// <returns>行コメントがバッファに追加されたことを示すメッセージ</returns>
@@ -50,6 +50,11 @@ public class PostCommentFunction
         if (string.IsNullOrWhiteSpace(filePath))
         {
             return "Error: File path cannot be empty";
+        }
+
+        if (lineNumber <= 0)
+        {
+            return "Error: Line number must be a positive integer (1 or greater)";
         }
 
         if (string.IsNullOrWhiteSpace(comment))

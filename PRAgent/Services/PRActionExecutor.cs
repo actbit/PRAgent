@@ -40,36 +40,109 @@ public class PRActionExecutor
 
         try
         {
-            // 1. レビューコメントを投稿
+            // ファイルごとのdiffをキャッシュ
+            var patchCache = new Dictionary<string, string?>();
+            var draftComments = new List<DraftPullRequestReviewComment>();
+            var errors = new List<string>();
+
+            // 行コメントを処理してDraftPullRequestReviewCommentに変換
+            foreach (var lineComment in buffer.LineComments)
+            {
+                int targetLine;
+                if (lineComment.LineNumber.HasValue)
+                {
+                    targetLine = lineComment.LineNumber.Value;
+                }
+                else if (lineComment.StartLine.HasValue)
+                {
+                    targetLine = lineComment.StartLine.Value;
+                }
+                else
+                {
+                    errors.Add($"Line comment must have either LineNumber or StartLine: {lineComment.FilePath}");
+                    continue;
+                }
+
+                var commentBody = lineComment.Suggestion != null
+                    ? $"{lineComment.Comment}\n```suggestion\n{lineComment.Suggestion}\n```"
+                    : lineComment.Comment;
+
+                // diffを取得（キャッシュを使用）
+                if (!patchCache.TryGetValue(lineComment.FilePath, out var patch))
+                {
+                    patch = await GetFilePatchAsync(lineComment.FilePath);
+                    patchCache[lineComment.FilePath] = patch;
+                }
+
+                // positionを計算
+                var position = CalculateDiffPosition(patch, targetLine);
+                if (!position.HasValue)
+                {
+                    errors.Add($"Could not find line {targetLine} in diff for file {lineComment.FilePath}");
+                    continue;
+                }
+
+                draftComments.Add(new DraftPullRequestReviewComment(commentBody, lineComment.FilePath, position.Value));
+            }
+
+            // レビュー本文を作成
+            var reviewBodyBuilder = new System.Text.StringBuilder();
+
+            // レビューコメントを追加
             if (buffer.ReviewComments.Count > 0)
             {
                 foreach (var reviewComment in buffer.ReviewComments)
                 {
-                    await _gitHubService.CreateReviewCommentAsync(
-                        _owner, _repo, _prNumber, reviewComment.Comment);
+                    reviewBodyBuilder.AppendLine(reviewComment.Comment);
+                    reviewBodyBuilder.AppendLine();
                 }
-                result.ReviewCommentsPosted = buffer.ReviewComments.Count;
             }
 
-            // 2. 行コメントを投稿
-            if (buffer.LineComments.Count > 0)
+            // 承認コメントを追加
+            if (!string.IsNullOrEmpty(buffer.ApprovalComment))
             {
-                var comments = buffer.LineComments.Select(c => (
-                    c.FilePath,
-                    c.LineNumber,
-                    c.StartLine,
-                    c.EndLine,
-                    c.Comment,
-                    c.Suggestion
-                )).ToList();
-
-                var reviewResult = await _gitHubService.CreateMultipleLineCommentsAsync(
-                    _owner, _repo, _prNumber, comments);
-
-                result.LineCommentsPosted = comments.Count;
+                reviewBodyBuilder.AppendLine(buffer.ApprovalComment);
             }
 
-            // 3. サマリーを全体コメントとして投稿
+            var reviewBody = reviewBodyBuilder.ToString().Trim();
+
+            // 1つのReviewとしてまとめて投稿
+            bool hasComments = draftComments.Count > 0 || !string.IsNullOrEmpty(reviewBody);
+            bool shouldApprove = buffer.ApprovalState == PRApprovalState.Approved;
+
+            if (hasComments || shouldApprove)
+            {
+                var reviewResult = await _gitHubService.CreateCompleteReviewAsync(
+                    _owner,
+                    _repo,
+                    _prNumber,
+                    reviewBody,
+                    draftComments,
+                    shouldApprove);
+
+                result.ReviewCommentsPosted = buffer.ReviewComments.Count;
+                result.LineCommentsPosted = draftComments.Count;
+
+                if (shouldApprove)
+                {
+                    result.Approved = true;
+                    result.ApprovalState = PRApprovalState.Approved;
+                    result.ApprovalUrl = reviewResult.HtmlUrl;
+                }
+            }
+
+            // 変更依頼の場合は別途投稿
+            if (buffer.ApprovalState == PRApprovalState.ChangesRequested)
+            {
+                var changesComment = $"## Changes Requested\n\n{buffer.ApprovalComment ?? "Please address the issues mentioned in the review."}";
+                await _gitHubService.CreateReviewCommentAsync(
+                    _owner, _repo, _prNumber, changesComment);
+
+                result.ApprovalState = PRApprovalState.ChangesRequested;
+                result.ChangesRequested = true;
+            }
+
+            // サマリーを全体コメントとして投稿
             if (buffer.Summaries.Count > 0)
             {
                 var summaryText = string.Join("\n\n", buffer.Summaries);
@@ -83,7 +156,7 @@ public class PRActionExecutor
                 result.SummaryCommentUrl = commentResult.HtmlUrl;
             }
 
-            // 4. 全体コメントを投稿
+            // 全体コメントを投稿
             if (!string.IsNullOrEmpty(buffer.GeneralComment))
             {
                 var commentResult = await _gitHubService.CreateIssueCommentAsync(
@@ -91,33 +164,6 @@ public class PRActionExecutor
 
                 result.GeneralCommentPosted = true;
                 result.GeneralCommentUrl = commentResult.HtmlUrl;
-            }
-
-            // 5. 承認ステータスに応じた処理を実行
-            switch (buffer.ApprovalState)
-            {
-                case PRApprovalState.Approved:
-                    var approvalResult = await _gitHubService.ApprovePullRequestAsync(
-                        _owner, _repo, _prNumber, buffer.ApprovalComment);
-
-                    result.Approved = true;
-                    result.ApprovalState = PRApprovalState.Approved;
-                    result.ApprovalUrl = approvalResult.HtmlUrl;
-                    break;
-
-                case PRApprovalState.ChangesRequested:
-                    // 変更依頼をレビューコメントとして投稿
-                    var changesComment = $"## Changes Requested\n\n{buffer.ApprovalComment ?? "Please address the issues mentioned in the review."}";
-                    await _gitHubService.CreateReviewCommentAsync(
-                        _owner, _repo, _prNumber, changesComment);
-
-                    result.ApprovalState = PRApprovalState.ChangesRequested;
-                    result.ChangesRequested = true;
-                    break;
-
-                case PRApprovalState.None:
-                    // 何もしない（コメントのみ）
-                    break;
             }
 
             result.TotalActionsPosted =
@@ -129,6 +175,11 @@ public class PRActionExecutor
                 (result.ChangesRequested ? 1 : 0);
 
             result.Message = $"Successfully posted {result.TotalActionsPosted} action(s) to PR #{_prNumber}";
+
+            if (errors.Count > 0)
+            {
+                result.Message += $"\n\nWarnings: {string.Join("; ", errors)}";
+            }
         }
         catch (Exception ex)
         {
@@ -138,6 +189,68 @@ public class PRActionExecutor
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// ファイルのdiffを取得します
+    /// </summary>
+    private async Task<string?> GetFilePatchAsync(string filePath)
+    {
+        var files = await _gitHubService.GetPullRequestFilesAsync(_owner, _repo, _prNumber);
+        var file = files.FirstOrDefault(f => f.FileName == filePath);
+        return file?.Patch;
+    }
+
+    /// <summary>
+    /// ファイルのdiffから行番号に対応するdiff positionを計算します
+    /// </summary>
+    private static int? CalculateDiffPosition(string? patch, int lineNumber)
+    {
+        if (string.IsNullOrEmpty(patch))
+            return null;
+
+        var lines = patch.Split('\n');
+        int position = 0;
+        int currentNewLine = 0;
+
+        foreach (var line in lines)
+        {
+            position++;
+
+            // Hunk headerを解析: @@ -start_old,count +start_new,count @@ heading
+            var hunkMatch = System.Text.RegularExpressions.Regex.Match(line, @"^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@");
+            if (hunkMatch.Success)
+            {
+                // 開始行番号の1つ前に設定（次の行でインクリメントして正しい行番号になるように）
+                currentNewLine = int.Parse(hunkMatch.Groups[1].Value) - 1;
+                continue;
+            }
+
+            // 行のタイプを判定
+            if (line.StartsWith("+"))
+            {
+                currentNewLine++;
+                if (currentNewLine == lineNumber)
+                {
+                    return position;
+                }
+            }
+            else if (line.StartsWith("-"))
+            {
+                // 削除行: 新しいファイルの行番号は変わらない
+            }
+            else if (line.StartsWith(" ") || (line.Length == 0 && position < lines.Length))
+            {
+                // コンテキスト行（空行はdiffの最後のアーティファクトを除く）
+                currentNewLine++;
+                if (currentNewLine == lineNumber)
+                {
+                    return position;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

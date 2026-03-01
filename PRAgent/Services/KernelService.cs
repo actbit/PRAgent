@@ -53,32 +53,8 @@ public class KernelService : IKernelService
 
     public Kernel CreateAgentKernel(string? systemPrompt = null)
     {
-        var builder = Kernel.CreateBuilder();
-
-        var endpoint = _aiSettings.Endpoint;
-
-        // エンドポイントが指定されている場合はカスタムエンドポイントを使用
-        if (!string.IsNullOrEmpty(endpoint))
-        {
-            _logger?.LogInformation("Using custom endpoint: {Endpoint}", endpoint);
-            builder.Services.AddOpenAIChatCompletion(
-                modelId: _aiSettings.ModelId,
-                apiKey: _aiSettings.ApiKey,
-                endpoint: new Uri(endpoint)
-            );
-        }
-        else
-        {
-            _logger?.LogInformation("Using default OpenAI endpoint");
-            builder.AddOpenAIChatCompletion(
-                modelId: _aiSettings.ModelId,
-                apiKey: _aiSettings.ApiKey
-            );
-        }
-
-        var kernel = builder.Build();
-
-        return kernel;
+        // CreateKernelと同じ実装なので委譲
+        return CreateKernel(systemPrompt);
     }
 
     public Kernel RegisterFunctionPlugins(Kernel kernel, IEnumerable<object> plugins)
