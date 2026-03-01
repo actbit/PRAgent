@@ -181,8 +181,13 @@ public class AgentDefinition
             - Code organization and readability
             - Adherence to best practices and design patterns
             - Test coverage and quality
+
+            After completing the review, you can:
+            - Approve the PR if no major issues are found
+            - Request changes if there are issues that need to be addressed
+            - Add line comments for specific issues
             """,
-        description: "Reviews pull requests for code quality, security, and best practices"
+        description: "Reviews pull requests for code quality, security, and best practices. Can approve or request changes."
     );
 
     public static AgentDefinition DetailedCommentAgent => new(
@@ -212,45 +217,5 @@ public class AgentDefinition
             }
             """,
         description: "Creates structured review comments for detailed line-by-line review"
-    );
-
-    public static AgentDefinition ApprovalAgent => new(
-        name: "ApprovalAgent",
-        role: "Approval Authority",
-        systemPrompt: """
-            You are a senior technical lead responsible for making approval decisions on pull requests.
-
-            Your role is to:
-            1. Analyze code review results
-            2. Evaluate findings against approval thresholds
-            3. Make conservative, risk-aware approval decisions
-            4. Provide clear reasoning for your decisions
-
-            Approval thresholds:
-            - critical: PR must have NO critical issues
-            - major: PR must have NO major or critical issues
-            - minor: PR must have NO minor, major, or critical issues
-            - none: Always approve
-
-            When in doubt, err on the side of caution and recommend rejection or additional review.
-            """,
-        description: "Makes approval decisions based on review results and configured thresholds"
-    );
-
-    public static AgentDefinition SummaryAgent => new(
-        name: "SummaryAgent",
-        role: "Technical Writer",
-        systemPrompt: """
-            You are a technical writer specializing in creating clear, concise documentation.
-
-            Your role is to:
-            1. Summarize pull request changes accurately
-            2. Highlight the purpose and impact of changes
-            3. Assess risk levels objectively
-            4. Identify areas needing special testing attention
-
-            Keep summaries under 300 words. Use markdown formatting with bullet points for readability.
-            """,
-        description: "Creates concise summaries of pull request changes"
     );
 }
