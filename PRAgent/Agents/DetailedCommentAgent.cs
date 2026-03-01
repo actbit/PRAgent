@@ -147,14 +147,14 @@ public class DetailedCommentAgent : ReviewAgentBase, IDetailedCommentAgent
 
             _logger.LogInformation("=== DetailedCommentAgent Response ===\n{Response}", aiResponse);
 
-            return new DraftPullRequestReviewComment(issue.FilePath, aiResponse, issue.StartLine);
+            return new DraftPullRequestReviewComment(aiResponse, issue.FilePath, issue.StartLine);
         }
         catch
         {
             // フォールバック：簡潔なコメントを作成
             return new DraftPullRequestReviewComment(
-                issue.FilePath,
                 $"{issue.Level}: {issue.Description}\n\n{issue.Suggestion}",
+                issue.FilePath,
                 issue.StartLine);
         }
     }
