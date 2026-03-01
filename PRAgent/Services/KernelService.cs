@@ -110,17 +110,17 @@ public class KernelService : IKernelService
         string prompt,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // プロンプトを出力
+        // プロンプットを出力
         _logger?.LogInformation("=== KernelService Prompt ===\n{Prompt}", prompt);
 
         var service = kernel.GetRequiredService<IChatCompletionService>();
         var chatHistory = new ChatHistory();
         chatHistory.AddUserMessage(prompt);
 
-        // ストリーミングを実行（リトライなし）
         await foreach (var content in service.GetStreamingChatMessageContentsAsync(chatHistory, cancellationToken: cancellationToken))
         {
-            yield return content.Content ?? string.Empty;
+            var responseContent = content.Content ?? string.Empty;
+            yield return responseContent;
         }
 
         _logger?.LogInformation("=== KernelService Response (Streaming) ===\n{Response}", "<streaming response>");
@@ -131,21 +131,17 @@ public class KernelService : IKernelService
         string prompt,
         CancellationToken cancellationToken = default)
     {
-        // プロンプトを出力
+        // プロンプットを出力
         _logger?.LogInformation("=== KernelService Prompt ===\n{Prompt}", prompt);
 
-        var service = kernel.GetRequiredService<IChatCompletionService>();
-        var chatHistory = new ChatHistory();
-        chatHistory.AddUserMessage(prompt);
+        var resultBuilder = new System.Text.StringBuilder();
 
-        // リトライ付きでストリーミングを実行して結果を収集
-        var results = await RetryHelper.ExecuteStreamingWithRetryAsync(
-            () => service.GetStreamingChatMessageContentsAsync(chatHistory, cancellationToken: cancellationToken),
-            "InvokePromptAsync",
-            _logger,
-            cancellationToken);
+        await foreach (var content in InvokePromptAsync(kernel, prompt, cancellationToken))
+        {
+            resultBuilder.Append(content);
+        }
 
-        var response = string.Join("", results.Select(c => c.Content ?? string.Empty));
+        var response = resultBuilder.ToString();
         _logger?.LogInformation("=== KernelService Response ===\n{Response}", response);
 
         return response;

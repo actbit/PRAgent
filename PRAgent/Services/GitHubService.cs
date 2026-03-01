@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using Octokit;
 using PRAgent.Models;
 
@@ -7,31 +6,23 @@ namespace PRAgent.Services;
 public class GitHubService : IGitHubService
 {
     private readonly GitHubClient _client;
-    private readonly ILogger<GitHubService>? _logger;
 
-    public GitHubService(string gitHubToken, ILogger<GitHubService>? logger = null)
+    public GitHubService(string gitHubToken)
     {
         _client = new GitHubClient(new ProductHeaderValue("PRAgent"))
         {
             Credentials = new Credentials(gitHubToken)
         };
-        _logger = logger;
     }
 
     public async Task<PullRequest> GetPullRequestAsync(string owner, string repo, int prNumber)
     {
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Get(owner, repo, prNumber),
-            nameof(GetPullRequestAsync),
-            _logger);
+        return await _client.PullRequest.Get(owner, repo, prNumber);
     }
 
     public async Task<IReadOnlyList<PullRequestFile>> GetPullRequestFilesAsync(string owner, string repo, int prNumber)
     {
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Files(owner, repo, prNumber),
-            nameof(GetPullRequestFilesAsync),
-            _logger);
+        return await _client.PullRequest.Files(owner, repo, prNumber);
     }
 
     public async Task<IReadOnlyList<PullRequestReviewComment>> GetPullRequestCommentsAsync(string owner, string repo, int prNumber)
@@ -43,10 +34,7 @@ public class GitHubService : IGitHubService
 
     public async Task<IReadOnlyList<IssueComment>> GetPullRequestReviewCommentsAsync(string owner, string repo, int prNumber)
     {
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.Issue.Comment.GetAllForIssue(owner, repo, prNumber),
-            nameof(GetPullRequestReviewCommentsAsync),
-            _logger);
+        return await _client.Issue.Comment.GetAllForIssue(owner, repo, prNumber);
     }
 
     public async Task<string> GetPullRequestDiffAsync(string owner, string repo, int prNumber)
@@ -87,10 +75,7 @@ public class GitHubService : IGitHubService
             Event = PullRequestReviewEvent.Comment
         };
 
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment),
-            nameof(CreateReviewCommentAsync),
-            _logger);
+        return await _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment);
     }
 
     public async Task<PullRequestReview> CreateReviewWithCommentsAsync(string owner, string repo, int prNumber, string reviewBody, List<DraftPullRequestReviewComment> comments)
@@ -102,10 +87,7 @@ public class GitHubService : IGitHubService
             Comments = comments
         };
 
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment),
-            nameof(CreateReviewWithCommentsAsync),
-            _logger);
+        return await _client.PullRequest.Review.Create(owner, repo, prNumber, reviewComment);
     }
 
     /// <summary>
@@ -120,18 +102,12 @@ public class GitHubService : IGitHubService
             Comments = comments
         };
 
-        await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Review.Create(owner, repo, prNumber, review),
-            nameof(CreateCompleteReviewAsync),
-            _logger);
+        await _client.PullRequest.Review.Create(owner, repo, prNumber, review);
     }
 
     public async Task<IssueComment> CreateIssueCommentAsync(string owner, string repo, int prNumber, string body)
     {
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.Issue.Comment.Create(owner, repo, prNumber, body),
-            nameof(CreateIssueCommentAsync),
-            _logger);
+        return await _client.Issue.Comment.Create(owner, repo, prNumber, body);
     }
 
     public async Task<PullRequestReview> ApprovePullRequestAsync(string owner, string repo, int prNumber, string? comment = null)
@@ -142,27 +118,17 @@ public class GitHubService : IGitHubService
             Event = PullRequestReviewEvent.Approve
         };
 
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Review.Create(owner, repo, prNumber, review),
-            nameof(ApprovePullRequestAsync),
-            _logger);
+        return await _client.PullRequest.Review.Create(owner, repo, prNumber, review);
     }
 
     public async Task<string?> GetRepositoryFileContentAsync(string owner, string repo, string path, string? branch = null)
     {
         try
         {
-            var defaultBranch = await RetryHelper.ExecuteWithRetryAsync(
-                () => _client.Repository.Get(owner, repo),
-                nameof(GetRepositoryFileContentAsync) + "_GetRepository",
-                _logger);
-
+            var defaultBranch = await _client.Repository.Get(owner, repo);
             var reference = branch ?? $"heads/{defaultBranch.DefaultBranch}";
 
-            var contents = await RetryHelper.ExecuteWithRetryAsync(
-                () => _client.Repository.Content.GetAllContentsByRef(owner, repo, path, reference),
-                nameof(GetRepositoryFileContentAsync) + "_GetContents",
-                _logger);
+            var contents = await _client.Repository.Content.GetAllContentsByRef(owner, repo, path, reference);
 
             if (contents.Count > 0)
             {
@@ -192,19 +158,19 @@ public class GitHubService : IGitHubService
         // 行コメントを作成
         var commentBody = suggestion != null ? $"{comment}\n```suggestion\n{suggestion}\n```" : comment;
 
-        var review = new PullRequestReviewCreate
-        {
-            Event = PullRequestReviewEvent.Comment,
-            Comments = new List<DraftPullRequestReviewComment>
+        return await _client.PullRequest.Review.Create(
+            owner,
+            repo,
+            prNumber,
+            new PullRequestReviewCreate
             {
-                new DraftPullRequestReviewComment(commentBody, filePath, lineNumber)
+                Event = PullRequestReviewEvent.Comment,
+                Comments = new List<DraftPullRequestReviewComment>
+                {
+                    new DraftPullRequestReviewComment(commentBody, filePath, lineNumber)
+                }
             }
-        };
-
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Review.Create(owner, repo, prNumber, review),
-            nameof(CreateLineCommentAsync),
-            _logger);
+        );
     }
 
     public async Task<PullRequestReview> CreateMultipleLineCommentsAsync(string owner, string repo, int prNumber, List<(string FilePath, int? LineNumber, int? StartLine, int? EndLine, string Comment, string? Suggestion)> comments)
@@ -229,15 +195,15 @@ public class GitHubService : IGitHubService
             }
         }).ToList();
 
-        var review = new PullRequestReviewCreate
-        {
-            Event = PullRequestReviewEvent.Comment,
-            Comments = draftComments
-        };
-
-        return await RetryHelper.ExecuteWithRetryAsync(
-            () => _client.PullRequest.Review.Create(owner, repo, prNumber, review),
-            nameof(CreateMultipleLineCommentsAsync),
-            _logger);
+        return await _client.PullRequest.Review.Create(
+            owner,
+            repo,
+            prNumber,
+            new PullRequestReviewCreate
+            {
+                Event = PullRequestReviewEvent.Comment,
+                Comments = draftComments
+            }
+        );
     }
 }
