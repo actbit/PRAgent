@@ -1,99 +1,80 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using PRAgent.Configuration;
 using PRAgent.Models;
 
 namespace PRAgent.Services;
 
 public class ConfigurationService : IConfigurationService
 {
-    private readonly IGitHubService _gitHubService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<ConfigurationService> _logger;
 
     public ConfigurationService(
-        IGitHubService gitHubService,
+        IConfiguration configuration,
         ILogger<ConfigurationService> logger)
     {
-        _gitHubService = gitHubService;
+        _configuration = configuration;
         _logger = logger;
     }
 
-    public async Task<PRAgentConfig> GetConfigurationAsync(string owner, string repo, int prNumber)
+    public Task<PRAgentConfig> GetConfigurationAsync(string owner, string repo, int prNumber)
     {
-        try
+        // appsettings.jsonから設定を読み込み
+        var config = new PRAgentConfig
         {
-            // Try to get .github/pragent.yml from the repository
-            var yamlContent = await _gitHubService.GetRepositoryFileContentAsync(owner, repo, ".github/pragent.yml");
-
-            if (!string.IsNullOrEmpty(yamlContent))
-            {
-                var config = YamlConfigurationProvider.Deserialize<PRAgentYmlConfig>(yamlContent);
-                if (config?.PRAgent != null)
-                {
-                    _logger.LogInformation("Loaded PRAgent configuration from .github/pragent.yml");
-                    return config.PRAgent;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load .github/pragent.yml, using default configuration");
-        }
-
-        // Return default configuration
-        _logger.LogInformation("Using default PRAgent configuration");
-        return GetDefaultConfiguration();
-    }
-
-    public async Task<string?> GetCustomPromptAsync(string owner, string repo, string promptPath)
-    {
-        if (string.IsNullOrEmpty(promptPath))
-        {
-            return null;
-        }
-
-        try
-        {
-            var content = await _gitHubService.GetRepositoryFileContentAsync(owner, repo, promptPath);
-            return content;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load custom prompt from {PromptPath}", promptPath);
-            return null;
-        }
-    }
-
-    private static PRAgentConfig GetDefaultConfiguration()
-    {
-        return new PRAgentConfig
-        {
-            Enabled = true,
-            SystemPrompt = "You are an expert code reviewer and technical writer.",
+            Enabled = _configuration.GetValue<bool>("PRAgent:Enabled", true),
+            SystemPrompt = _configuration["PRAgent:SystemPrompt"],
             Review = new ReviewConfig
             {
-                Enabled = true,
-                AutoPost = false
+                Enabled = _configuration.GetValue<bool>("PRAgent:Review:Enabled", true),
+                AutoPost = _configuration.GetValue<bool>("PRAgent:Review:AutoPost", false),
+                CustomPrompt = _configuration["PRAgent:Review:CustomPrompt"]
             },
             Summary = new SummaryConfig
             {
-                Enabled = true,
-                PostAsComment = true
+                Enabled = _configuration.GetValue<bool>("PRAgent:Summary:Enabled", true),
+                PostAsComment = _configuration.GetValue<bool>("PRAgent:Summary:PostAsComment", true),
+                CustomPrompt = _configuration["PRAgent:Summary:CustomPrompt"]
             },
             Approve = new ApproveConfig
             {
-                Enabled = true,
-                AutoApproveThreshold = "minor",
-                RequireReviewFirst = true
+                Enabled = _configuration.GetValue<bool>("PRAgent:Approve:Enabled", true),
+                AutoApproveThreshold = _configuration.GetValue<string>("PRAgent:Approve:AutoApproveThreshold", "minor") ?? "minor",
+                RequireReviewFirst = _configuration.GetValue<bool>("PRAgent:Approve:RequireReviewFirst", true)
             },
-            IgnorePaths = new List<string>
+            IgnorePaths = _configuration.GetSection("PRAgent:IgnorePaths").Get<List<string>>() ?? GetDefaultIgnorePaths(),
+            AgentFramework = new AgentFrameworkConfig
             {
-                "*.min.js",
-                "dist/**",
-                "node_modules/**",
-                "*.min.css",
-                "bin/**",
-                "obj/**"
+                Enabled = _configuration.GetValue<bool>("PRAgent:AgentFramework:Enabled", true),
+                OrchestrationMode = _configuration.GetValue<string>("PRAgent:AgentFramework:OrchestrationMode", "sequential") ?? "sequential",
+                SelectionStrategy = _configuration.GetValue<string>("PRAgent:AgentFramework:SelectionStrategy", "approval_workflow") ?? "approval_workflow",
+                EnableFunctionCalling = _configuration.GetValue<bool>("PRAgent:AgentFramework:EnableFunctionCalling", true),
+                EnableAutoApproval = _configuration.GetValue<bool>("PRAgent:AgentFramework:EnableAutoApproval", true),
+                MaxTurns = _configuration.GetValue<int>("PRAgent:AgentFramework:MaxTurns", 10)
             }
+        };
+
+        _logger.LogInformation("Loaded PRAgent configuration from appsettings.json");
+        return Task.FromResult(config);
+    }
+
+    public Task<string?> GetCustomPromptAsync(string owner, string repo, string promptPath)
+    {
+        // appsettings.jsonからカスタムプロンプトを取得
+        var customPrompt = _configuration[$"PRAgent:CustomPrompts:{promptPath}"];
+        return Task.FromResult(customPrompt);
+    }
+
+    private static List<string> GetDefaultIgnorePaths()
+    {
+        return new List<string>
+        {
+            "*.min.js",
+            "dist/**",
+            "node_modules/**",
+            "*.min.css",
+            "bin/**",
+            "obj/**"
         };
     }
 }

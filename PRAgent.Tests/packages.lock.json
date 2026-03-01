@@ -63,12 +63,32 @@
           "System.Memory.Data": "8.0.1"
         }
       },
+      "Azure.Identity": {
+        "type": "Transitive",
+        "resolved": "1.17.0",
+        "contentHash": "QZiMa1O5lTniWTSDPyPVdBKOS0/M5DWXTfQ2xLOot96yp8Q5A69iScGtzCIxfbg/4bmp/TynibZ2VK1v3qsSNA==",
+        "dependencies": {
+          "Azure.Core": "1.49.0",
+          "Microsoft.Identity.Client": "4.76.0",
+          "Microsoft.Identity.Client.Extensions.Msal": "4.76.0"
+        }
+      },
       "Castle.Core": {
         "type": "Transitive",
         "resolved": "5.1.1",
         "contentHash": "rpYtIczkzGpf+EkZgDr9CClTdemhsrwA/W5hMoPjLkRFnXzH44zDLoovXeKtmxb1ykXK9aJVODSpiJml8CTw2g==",
         "dependencies": {
           "System.Diagnostics.EventLog": "6.0.0"
+        }
+      },
+      "Microsoft.Agents.AI.Abstractions": {
+        "type": "Transitive",
+        "resolved": "1.0.0-preview.251009.1",
+        "contentHash": "8Bfppenx9ETyhDsJ30Hixy/zf/t2t/vt03+jl7uLd5XgadZo+xQcEYa16ANHUAcJzBH7ou85sSRO8MohNiFgiw==",
+        "dependencies": {
+          "Microsoft.Extensions.AI.Abstractions": "9.9.1",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Logging.Abstractions": "9.0.9"
         }
       },
       "Microsoft.Bcl.AsyncInterfaces": {
@@ -408,6 +428,28 @@
           "Microsoft.Extensions.AI.Abstractions": "9.5.0"
         }
       },
+      "Microsoft.Identity.Client": {
+        "type": "Transitive",
+        "resolved": "4.76.0",
+        "contentHash": "j2FtmljuCveDJ7umBVYm6Bx3iVGA71U07Dc7byGr2Hrj7XlByZSknruCBUeYN3V75nn1VEhXegxE0MerxvxrXQ==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Abstractions": "6.35.0"
+        }
+      },
+      "Microsoft.Identity.Client.Extensions.Msal": {
+        "type": "Transitive",
+        "resolved": "4.76.0",
+        "contentHash": "D0n3yMTa3gnDh1usrJmyxGWKYeqbQNCWLgQ0Tswf7S6nk9YobiCOX+M2V8EX5SPqkZxpwkTT6odAhaafu3TIeA==",
+        "dependencies": {
+          "Microsoft.Identity.Client": "4.76.0",
+          "System.Security.Cryptography.ProtectedData": "4.5.0"
+        }
+      },
+      "Microsoft.IdentityModel.Abstractions": {
+        "type": "Transitive",
+        "resolved": "6.35.0",
+        "contentHash": "xuR8E4Rd96M41CnUSCiOJ2DBh+z+zQSmyrYHdYhD6K4fXBcQGVnRCFQ0efROUYpP+p0zC1BLKr0JRpVuujTZSg=="
+      },
       "Microsoft.SemanticKernel": {
         "type": "Transitive",
         "resolved": "1.68.0",
@@ -425,6 +467,36 @@
           "Microsoft.Bcl.HashCode": "1.1.1",
           "Microsoft.Extensions.AI": "10.0.1",
           "Microsoft.Extensions.VectorData.Abstractions": "9.7.0"
+        }
+      },
+      "Microsoft.SemanticKernel.Agents.Abstractions": {
+        "type": "Transitive",
+        "resolved": "1.68.0",
+        "contentHash": "hkKxc0Fuy4+ax3HjDyGtzm0EESEX0Qq/Q2vEYjCe2x9KEsiAAU+droPeqrWoy48+u0o01oGkA0IgA07u9Ta/jw==",
+        "dependencies": {
+          "Microsoft.Agents.AI.Abstractions": "1.0.0-preview.251009.1",
+          "Microsoft.SemanticKernel.Abstractions": "1.68.0"
+        }
+      },
+      "Microsoft.SemanticKernel.Agents.Core": {
+        "type": "Transitive",
+        "resolved": "1.68.0",
+        "contentHash": "b+3d4cHXLKSg73BZLlqGUf0jb254fVdYCH5gQiUYHNLEoGNRk5JkUt6gr0p0Uomp+ooBz7tFfhWYEpBsTni2Bw==",
+        "dependencies": {
+          "Microsoft.SemanticKernel.Agents.Abstractions": "1.68.0",
+          "Microsoft.SemanticKernel.Core": "1.68.0"
+        }
+      },
+      "Microsoft.SemanticKernel.Agents.OpenAI": {
+        "type": "Transitive",
+        "resolved": "1.68.0-preview",
+        "contentHash": "I5GQkj9BdzI5e1y1iWl6BPkZCbA5IqC+07CraTa/Y+/EGDI88RO4UEoClmyq7bGv/hF+9eFD5pasWmhWnWGf1Q==",
+        "dependencies": {
+          "Azure.AI.OpenAI": "2.7.0-beta.2",
+          "Azure.Identity": "1.17.0",
+          "Microsoft.SemanticKernel.Agents.Abstractions": "1.68.0",
+          "Microsoft.SemanticKernel.Agents.Core": "1.68.0",
+          "Microsoft.SemanticKernel.Connectors.OpenAI": "1.68.0"
         }
       },
       "Microsoft.SemanticKernel.Connectors.AzureOpenAI": {
@@ -560,6 +632,11 @@
         "resolved": "10.0.0",
         "contentHash": "PxZKFx8ACAt7gRnTSDgtZFA06cimls5XL1Olv63bWF8qKL5+EQdqq3K02etW4LNut4xDoREPe9z7QYATLMkBPA=="
       },
+      "System.Security.Cryptography.ProtectedData": {
+        "type": "Transitive",
+        "resolved": "4.5.0",
+        "contentHash": "wLBKzFnDCxP12VL9ANydSYhk59fC4cvOr9ypYQLPnAj48NQIhqnjdD2yhP8yEKyBJEjERWS9DisKL7rX5eU25Q=="
+      },
       "xunit.abstractions": {
         "type": "Transitive",
         "resolved": "2.0.3",
@@ -615,6 +692,8 @@
           "Microsoft.Extensions.Hosting": "[10.0.0, )",
           "Microsoft.Extensions.Logging": "[10.0.0, )",
           "Microsoft.SemanticKernel": "[1.68.0, )",
+          "Microsoft.SemanticKernel.Agents.Core": "[1.68.0, )",
+          "Microsoft.SemanticKernel.Agents.OpenAI": "[1.68.0-preview, )",
           "Microsoft.SemanticKernel.Connectors.OpenAI": "[1.68.0, )",
           "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
           "Octokit": "[14.0.0, )",

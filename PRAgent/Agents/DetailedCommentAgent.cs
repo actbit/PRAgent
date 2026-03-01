@@ -1,210 +1,289 @@
-using Microsoft.SemanticKernel;
 using Microsoft.Extensions.Logging;
-using Octokit;
-using PRAgent.Models;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using PRAgent.Services;
 
 namespace PRAgent.Agents;
 
 /// <summary>
 /// 詳細な行コメントを作成するサブエージェント
-/// Tool呼び出しベースで各問題点ごとにコメントを作成
+/// ReviewAgentからFunction Callingで呼び出され、個々の問題について詳細なコメントを生成
 /// </summary>
-public class DetailedCommentAgent : ReviewAgentBase, IDetailedCommentAgent
+public class DetailedCommentAgent : IDetailedCommentAgent
 {
+    private readonly IKernelService _kernelService;
     private readonly ILogger<DetailedCommentAgent> _logger;
+    private string _language = "en";
 
     public DetailedCommentAgent(
         IKernelService kernelService,
-        IGitHubService gitHubService,
-        PullRequestDataService prDataService,
-        AISettings aiSettings,
-        ILogger<DetailedCommentAgent> logger,
-        string? customSystemPrompt = null)
-        : base(kernelService, gitHubService, prDataService, aiSettings, AgentDefinition.DetailedCommentAgent, customSystemPrompt)
+        ILogger<DetailedCommentAgent> logger)
     {
+        _kernelService = kernelService;
         _logger = logger;
     }
 
     /// <summary>
     /// 言語を動的に設定
     /// </summary>
-    public new void SetLanguage(string language) => base.SetLanguage(language);
+    public void SetLanguage(string language)
+    {
+        _language = language;
+    }
 
     /// <summary>
-    /// レビュー結果から詳細な行コメントを作成
+    /// 個々の問題について詳細なコメントを生成（Function Calling用）
     /// </summary>
-    public async Task<List<DraftPullRequestReviewComment>> CreateCommentsAsync(string review, string language)
+    /// <param name="filePath">ファイルパス</param>
+    /// <param name="lineNumber">行番号</param>
+    /// <param name="codeSnippet">周辺コード</param>
+    /// <param name="issueSummary">問題の概要</param>
+    /// <returns>詳細なコメント（JSON形式）</returns>
+    [KernelFunction("get_detailed_comment")]
+    public async Task<string> GetDetailedCommentAsync(
+        string filePath,
+        int lineNumber,
+        string codeSnippet,
+        string issueSummary)
+    {
+        var systemPrompt = GetDetailedCommentPrompt(_language);
+        var kernel = _kernelService.CreateAgentKernel(systemPrompt);
+
+        var prompt = $$"""
+            以下のコードの問題点について、GitHubのプルリクエストレビュー用の詳細なコメントを作成してください。
+
+            ## ファイル情報
+            - ファイルパス: {{filePath}}
+            - 行番号: {{lineNumber}}
+
+            ## 対象コード
+            ```
+            {{codeSnippet}}
+            ```
+
+            ## 問題の概要
+            {{issueSummary}}
+
+            ## 出力形式（JSON）
+            以下の形式で出力してください：
+            ```json
+            {
+              "path": "{{filePath}}",
+              "line": {{lineNumber}},
+              "body": "詳細なコメント本文",
+              "suggestion": "修正提案のコード（あれば）"
+            }
+            ```
+
+            重要: 必ず有効なJSONオブジェクトのみを出力してください。
+            """;
+
+        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+        var chatHistory = new ChatHistory();
+        chatHistory.AddUserMessage(prompt);
+
+        var response = await chatService.GetChatMessageContentsAsync(chatHistory, executionSettings: null, kernel);
+        var responseText = response.FirstOrDefault()?.Content ?? "{}";
+
+        _logger.LogInformation("=== DetailedCommentAgent Response for {File}:{Line} ===\n{Response}",
+            filePath, lineNumber, responseText);
+
+        return responseText;
+    }
+
+    /// <summary>
+    /// 複数の問題について一括で詳細コメントを生成（バッチ処理用）
+    /// </summary>
+    public async Task<List<LineCommentData>> CreateDetailedCommentsAsync(
+        List<IssueContext> issues,
+        string language)
     {
         SetLanguage(language);
-
-        // レビュー内容から問題点を抽出
-        var issues = ExtractIssuesFromReview(review);
-
-        // 各問題点に対してTool呼び出しでコメントを作成
-        var comments = new List<DraftPullRequestReviewComment>();
+        var results = new List<LineCommentData>();
 
         foreach (var issue in issues)
         {
-            var comment = await CreateCommentForIssueAsync(issue, language);
-            if (comment != null)
+            try
             {
-                comments.Add(comment);
+                var jsonResult = await GetDetailedCommentAsync(
+                    issue.FilePath,
+                    issue.LineNumber,
+                    issue.CodeSnippet,
+                    issue.IssueSummary);
+
+                var comment = ParseSingleCommentFromJson(jsonResult);
+                if (comment != null)
+                {
+                    results.Add(comment);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create detailed comment for {File}:{Line}",
+                    issue.FilePath, issue.LineNumber);
             }
         }
 
-        return comments;
+        return results;
     }
 
     /// <summary>
-    /// レビューから問題点を抽出
+    /// レビュー概要から詳細な行コメントを作成（従来のメソッド、互換性のため残す）
     /// </summary>
-    private List<ReviewIssue> ExtractIssuesFromReview(string review)
+    public async Task<List<LineCommentData>> CreateCommentsAsync(string reviewOverview, string language)
     {
-        var issues = new List<ReviewIssue>();
+        SetLanguage(language);
 
-        // セクションごとに分割
-        var sections = review.Split(new[] { "\n\n### ", "\n## ", "\n##\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+        var systemPrompt = GetDetailedCommentPrompt(_language);
+        var kernel = _kernelService.CreateAgentKernel(systemPrompt);
 
-        foreach (var section in sections)
-        {
-            // セクションタイトルを解析
-            var titleMatch = System.Text.RegularExpressions.Regex.Match(section, @"^(###\s*\[([A-Z]+)\])?\s*(.+)");
-            if (titleMatch.Success)
-            {
-                var levelStr = titleMatch.Groups[2].Value;
-                var title = titleMatch.Groups[3].Value.Trim();
+        var prompt = $$"""
+            以下のレビュー概要に基づいて、GitHubのプルリクエストレビュー用の詳細な行コメントを作成してください。
 
-                // レベルを判定
-                var level = levelStr switch
-                {
-                    "CRITICAL" => Severity.Critical,
-                    "MAJOR" => Severity.Major,
-                    "MINOR" => Severity.Minor,
-                    "POSITIVE" => Severity.Positive,
-                    _ => Severity.Major
-                };
+            ## レビュー概要
+            {{reviewOverview}}
 
-                // ファイルパスを抽出
-                var pathMatch = System.Text.RegularExpressions.Regex.Match(section, @"\*\*ファイル:\*\*`([^`]+)`");
-                var path = pathMatch.Success ? pathMatch.Groups[1].Value : "src/File.cs";
+            ## 指示
+            1. 各問題点に対して、ファイルパス、行番号、コメント本文を抽出
+            2. コメントは簡潔かつ建設的に
+            3. 修正提案がある場合は suggestion ブロックを含める
 
-                // 行番号を抽出
-                var lineMatch = System.Text.RegularExpressions.Regex.Match(section, @"\(lines?\s*(\d+)(?:-(\d+))?\)");
-                int? startLine = null;
-                int? endLine = null;
+            ## 出力形式（JSON）
+            ```json
+            [
+              {
+                "path": "src/File.cs",
+                "line": 45,
+                "body": "ここでメモリリークが発生する可能性があります。using文を使用してください。",
+                "suggestion": "using var resource = ...;"
+              }
+            ]
+            ```
 
-                if (lineMatch.Success)
-                {
-                    startLine = int.Parse(lineMatch.Groups[1].Value);
-                    if (lineMatch.Groups[2].Success)
-                    {
-                        endLine = int.Parse(lineMatch.Groups[2].Value);
-                    }
-                }
+            重要: 必ず有効なJSON配列のみを出力してください。
+            """;
 
-                // 問題説明を抽出
-                var problemSection = System.Text.RegularExpressions.Regex.Split(section, @"\n\*\*\w+:\*\*");
-                var problem = problemSection.Length > 1 ? problemSection[1].Split('\n')[0].Trim() : section.Split('\n')[0].Trim();
+        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+        var chatHistory = new ChatHistory();
+        chatHistory.AddUserMessage(prompt);
 
-                // 修正提案を抽出
-                var suggestion = "";
-                var suggestionMatch = System.Text.RegularExpressions.Regex.Match(section, @"```suggestion\s*\n?([^\n`]+)");
-                if (suggestionMatch.Success)
-                {
-                    suggestion = suggestionMatch.Groups[1].Value.Trim();
-                }
+        var response = await chatService.GetChatMessageContentsAsync(chatHistory, executionSettings: null, kernel);
+        var responseText = response.FirstOrDefault()?.Content ?? "[]";
 
-                issues.Add(new ReviewIssue
-                {
-                    Title = title,
-                    Level = level,
-                    FilePath = path,
-                    StartLine = startLine ?? 1,
-                    EndLine = endLine ?? 1,
-                    Description = problem,
-                    Suggestion = suggestion
-                });
-            }
-        }
+        _logger.LogInformation("=== DetailedCommentAgent Response ===\n{Response}", responseText);
 
-        return issues;
+        return ParseCommentsFromJson(responseText);
     }
 
     /// <summary>
-    /// 各問題点に対してコメントを作成
+    /// 単一のJSONオブジェクトから行コメントデータをパース
     /// </summary>
-    private async Task<DraftPullRequestReviewComment?> CreateCommentForIssueAsync(ReviewIssue issue, string language)
+    private LineCommentData? ParseSingleCommentFromJson(string json)
     {
         try
         {
-            var prompt = CreateCommentPrompt(issue, language);
+            // コードブロック内のJSONを探す
+            var codeBlockMatch = System.Text.RegularExpressions.Regex.Match(json, @"```(?:json)?\s*([\s\S]*?)```");
+            if (codeBlockMatch.Success)
+            {
+                json = codeBlockMatch.Groups[1].Value.Trim();
+            }
 
-            // プロンプットを出力
-            _logger.LogInformation("=== DetailedCommentAgent Prompt for Issue ===\n{Prompt}", prompt);
+            // JSONオブジェクトを探す
+            var jsonMatch = System.Text.RegularExpressions.Regex.Match(json, @"\{[\s\S]*?\}");
+            if (!jsonMatch.Success)
+            {
+                _logger.LogWarning("No valid JSON object found in response");
+                return null;
+            }
 
-            var aiResponse = await KernelService.InvokePromptAsStringAsync(CreateKernel(), prompt);
-
-            _logger.LogInformation("=== DetailedCommentAgent Response ===\n{Response}", aiResponse);
-
-            return new DraftPullRequestReviewComment(issue.FilePath, aiResponse, issue.StartLine);
+            return System.Text.Json.JsonSerializer.Deserialize<LineCommentData>(jsonMatch.Value);
         }
-        catch
+        catch (Exception ex)
         {
-            // フォールバック：簡潔なコメントを作成
-            return new DraftPullRequestReviewComment(
-                issue.FilePath,
-                $"{issue.Level}: {issue.Description}\n\n{issue.Suggestion}",
-                issue.StartLine);
+            _logger.LogError(ex, "Failed to parse single comment from JSON");
+            return null;
         }
     }
 
     /// <summary>
-    /// コメント生成用のプロンプトを作成
+    /// JSON配列から行コメントデータをパース
     /// </summary>
-    private string CreateCommentPrompt(ReviewIssue issue, string language)
+    private List<LineCommentData> ParseCommentsFromJson(string json)
     {
-        return $$"""
-            Create a detailed GitHub pull request review comment for this issue:
+        try
+        {
+            // まずコードブロック内のJSONを探す
+            var codeBlockMatch = System.Text.RegularExpressions.Regex.Match(json, @"```(?:json)?\s*([\s\S]*?)```");
+            if (codeBlockMatch.Success)
+            {
+                json = codeBlockMatch.Groups[1].Value.Trim();
+            }
 
-            **Issue Title:** {{issue.Title}}
-            **Level:** {{issue.Level}}
-            **File:** {{issue.FilePath}} (Line {{issue.StartLine}})
-            **Description:** {{issue.Description}}
-            **Suggestion:** {{issue.Suggestion}}
+            // JSON配列を探す（非貪欲マッチ）
+            var jsonMatch = System.Text.RegularExpressions.Regex.Match(json, @"\[[\s\S]*?\]");
+            if (!jsonMatch.Success)
+            {
+                _logger.LogWarning("No valid JSON array found in response");
+                return new List<LineCommentData>();
+            }
 
-            Create a concise comment that:
-            1. Clearly describes the problem
-            2. Provides actionable feedback
-            3. Uses professional and constructive language
-            4. Keep it under 200 words
+            var jsonArray = jsonMatch.Value;
+            var comments = System.Text.Json.JsonSerializer.Deserialize<List<LineCommentData>>(jsonArray);
 
-            **Output:** Only the comment text, no formatting.
-            """;
+            return comments ?? new List<LineCommentData>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to parse comments from JSON");
+            return new List<LineCommentData>();
+        }
     }
-}
 
-/// <summary>
-/// レビュー問題のデータモデル
-/// </summary>
-public class ReviewIssue
-{
-    public string Title { get; set; } = string.Empty;
-    public Severity Level { get; set; }
-    public string FilePath { get; set; } = string.Empty;
-    public int StartLine { get; set; }
-    public int EndLine { get; set; }
-    public string Description { get; set; } = string.Empty;
-    public string Suggestion { get; set; } = string.Empty;
-}
+    /// <summary>
+    /// 言語に応じた詳細コメント用プロンプトを取得
+    /// </summary>
+    private static string GetDetailedCommentPrompt(string language)
+    {
+        var isJapanese = language?.ToLowerInvariant() == "ja";
 
-/// <summary>
-/// レベルの列挙型
-/// </summary>
-public enum Severity
-{
-    Critical,
-    Major,
-    Minor,
-    Positive
+        if (isJapanese)
+        {
+            return """
+                あなたはGitHubのプルリクエストレビュー用の詳細コメントを作成する専門家です。
+
+                ## 役割
+                指定されたコードの問題点について、詳細なコメントを生成
+
+                ## 出力ルール
+                1. 有効なJSONオブジェクトのみを出力
+                2. コメントには以下を含める:
+                   - path: ファイルパス（入力と同じ値）
+                   - line: 行番号（入力と同じ値）
+                   - body: 詳細なコメント本文
+                   - suggestion: 修正提案（オプション）
+                3. コメントは建設的で、修正方法を具体的に提示
+                4. コードスニペットを参照して、具体的な改善案を提示
+                """;
+        }
+        else
+        {
+            return """
+                You are an expert at creating detailed line comments for GitHub pull request reviews.
+
+                ## Your Role
+                Generate detailed comments for specified code issues.
+
+                ## Output Rules
+                1. Output only valid JSON object
+                2. Include in comment:
+                   - path: file path (same as input)
+                   - line: line number (same as input)
+                   - body: detailed comment body
+                   - suggestion: fix suggestion (optional)
+                3. Keep comments constructive with specific improvement suggestions
+                4. Reference the code snippet and provide concrete fixes
+                """;
+        }
+    }
 }

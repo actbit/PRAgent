@@ -10,8 +10,21 @@ public interface IGitHubService
     Task<IReadOnlyList<IssueComment>> GetPullRequestReviewCommentsAsync(string owner, string repo, int prNumber);
     Task<string> GetPullRequestDiffAsync(string owner, string repo, int prNumber);
     Task<PullRequestReview> CreateReviewCommentAsync(string owner, string repo, int prNumber, string body);
+    Task<PullRequestReview> CreateLineCommentAsync(string owner, string repo, int prNumber, string filePath, int lineNumber, string comment, string? suggestion = null);
+    Task<PullRequestReview> CreateMultipleLineCommentsAsync(string owner, string repo, int prNumber, List<(string FilePath, int? LineNumber, int? StartLine, int? EndLine, string Comment, string? Suggestion)> comments);
     Task<IssueComment> CreateIssueCommentAsync(string owner, string repo, int prNumber, string body);
     Task<PullRequestReview> ApprovePullRequestAsync(string owner, string repo, int prNumber, string? comment = null);
     Task<string?> GetRepositoryFileContentAsync(string owner, string repo, string path, string? branch = null);
     Task<bool> FileExistsAsync(string owner, string repo, string path, string? branch = null);
+
+    /// <summary>
+    /// レビュー本文、行コメント、承認ステータスをまとめて1つのReviewとして投稿します
+    /// </summary>
+    Task<PullRequestReview> CreateCompleteReviewAsync(
+        string owner,
+        string repo,
+        int prNumber,
+        string? reviewBody,
+        List<DraftPullRequestReviewComment> comments,
+        bool approve = false);
 }
