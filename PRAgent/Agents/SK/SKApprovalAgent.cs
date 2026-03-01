@@ -106,7 +106,7 @@ public class SKApprovalAgent
         CancellationToken cancellationToken = default)
     {
         // まずReviewエージェントを呼び出してレビューを実行
-        var reviewAgent = new SKReviewAgent(_agentFactory, _prDataService);
+        var reviewAgent = new SKReviewAgent(_agentFactory, _prDataService, _gitHubService);
         var reviewResult = await reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken: cancellationToken);
 
         // 決定を行う

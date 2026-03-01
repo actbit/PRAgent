@@ -51,6 +51,26 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
     /// </summary>
     public async Task<string> ReviewAsync(string owner, string repo, int prNumber, CancellationToken cancellationToken = default)
     {
+        // FunctionCalling設定に応じてメソッドを選択
+        var useFunctionCalling = _config.AgentFramework?.EnableFunctionCalling ?? false;
+
+        if (useFunctionCalling)
+        {
+            // 行コメント付きレビューを実行
+            var (reviewText, actionResult) = await _reviewAgent.ReviewWithLineCommentsAsync(
+                owner, repo, prNumber, language: null, cancellationToken);
+
+            if (actionResult != null)
+            {
+                _logger.LogInformation(
+                    "Review with line comments completed. Line comments: {LineComments}, Review comments: {ReviewComments}",
+                    actionResult.LineCommentsPosted,
+                    actionResult.ReviewCommentsPosted);
+            }
+
+            return reviewText;
+        }
+
         return await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken: cancellationToken);
     }
 
