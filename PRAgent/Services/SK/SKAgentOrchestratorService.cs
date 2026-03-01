@@ -37,23 +37,44 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
     {
         // FunctionCalling設定に応じてメソッドを選択
         var useFunctionCalling = _config.AgentFramework?.EnableFunctionCalling ?? false;
+        var useSubAgent = _config.AgentFramework?.UseSubAgent ?? true;
 
         if (useFunctionCalling)
         {
-            // 行コメント付きレビューを実行（承認機能含む）
-            var (reviewText, actionResult) = await _reviewAgent.ReviewWithLineCommentsAsync(
-                owner, repo, prNumber, language: null, cancellationToken);
-
-            if (actionResult != null)
+            if (useSubAgent)
             {
-                _logger.LogInformation(
-                    "Review completed. Line comments: {LineComments}, Review comments: {ReviewComments}, Approved: {Approved}",
-                    actionResult.LineCommentsPosted,
-                    actionResult.ReviewCommentsPosted,
-                    actionResult.Approved);
-            }
+                // SubAgentあり: ReviewAgentで概要 → DetailedCommentAgentで詳細
+                var (reviewText, actionResult) = await _reviewAgent.ReviewWithLineCommentsAsync(
+                    owner, repo, prNumber, language: null, cancellationToken);
 
-            return reviewText;
+                if (actionResult != null)
+                {
+                    _logger.LogInformation(
+                        "Review completed (with SubAgent). Line comments: {LineComments}, Review comments: {ReviewComments}, Approved: {Approved}",
+                        actionResult.LineCommentsPosted,
+                        actionResult.ReviewCommentsPosted,
+                        actionResult.Approved);
+                }
+
+                return reviewText;
+            }
+            else
+            {
+                // SubAgentなし: ReviewAgentだけで完結
+                var (reviewText, actionResult) = await _reviewAgent.ReviewDirectAsync(
+                    owner, repo, prNumber, language: null, cancellationToken);
+
+                if (actionResult != null)
+                {
+                    _logger.LogInformation(
+                        "Review completed (direct mode). Line comments: {LineComments}, Review comments: {ReviewComments}, Approved: {Approved}",
+                        actionResult.LineCommentsPosted,
+                        actionResult.ReviewCommentsPosted,
+                        actionResult.Approved);
+                }
+
+                return reviewText;
+            }
         }
 
         return await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken: cancellationToken);
@@ -65,22 +86,42 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
     public async Task<string> ReviewAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default)
     {
         var useFunctionCalling = _config.AgentFramework?.EnableFunctionCalling ?? false;
+        var useSubAgent = _config.AgentFramework?.UseSubAgent ?? true;
 
         if (useFunctionCalling)
         {
-            var (reviewText, actionResult) = await _reviewAgent.ReviewWithLineCommentsAsync(
-                owner, repo, prNumber, language, cancellationToken);
-
-            if (actionResult != null)
+            if (useSubAgent)
             {
-                _logger.LogInformation(
-                    "Review completed. Line comments: {LineComments}, Review comments: {ReviewComments}, Approved: {Approved}",
-                    actionResult.LineCommentsPosted,
-                    actionResult.ReviewCommentsPosted,
-                    actionResult.Approved);
-            }
+                var (reviewText, actionResult) = await _reviewAgent.ReviewWithLineCommentsAsync(
+                    owner, repo, prNumber, language, cancellationToken);
 
-            return reviewText;
+                if (actionResult != null)
+                {
+                    _logger.LogInformation(
+                        "Review completed (with SubAgent). Line comments: {LineComments}, Review comments: {ReviewComments}, Approved: {Approved}",
+                        actionResult.LineCommentsPosted,
+                        actionResult.ReviewCommentsPosted,
+                        actionResult.Approved);
+                }
+
+                return reviewText;
+            }
+            else
+            {
+                var (reviewText, actionResult) = await _reviewAgent.ReviewDirectAsync(
+                    owner, repo, prNumber, language, cancellationToken);
+
+                if (actionResult != null)
+                {
+                    _logger.LogInformation(
+                        "Review completed (direct mode). Line comments: {LineComments}, Review comments: {ReviewComments}, Approved: {Approved}",
+                        actionResult.LineCommentsPosted,
+                        actionResult.ReviewCommentsPosted,
+                        actionResult.Approved);
+                }
+
+                return reviewText;
+            }
         }
 
         return await _reviewAgent.ReviewAsync(owner, repo, prNumber, cancellationToken: cancellationToken);
@@ -88,7 +129,7 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
 
     /// <summary>
     /// レビューと承認を一連のワークフローとして実行します
-    /// ReviewAgentに統合されたため、ReviewWithLineCommentsAsyncを使用
+    /// ReviewAgentに統合されたため、ReviewWithLineCommentsAsyncまたはReviewDirectAsyncを使用
     /// </summary>
     public async Task<ApprovalResult> ReviewAndApproveAsync(
         string owner,
@@ -98,11 +139,13 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         CancellationToken cancellationToken = default)
     {
         var useFunctionCalling = _config.AgentFramework?.EnableFunctionCalling ?? false;
+        var useSubAgent = _config.AgentFramework?.UseSubAgent ?? true;
 
         if (useFunctionCalling)
         {
-            var (reviewText, actionResult) = await _reviewAgent.ReviewWithLineCommentsAsync(
-                owner, repo, prNumber, language: null, cancellationToken);
+            var (reviewText, actionResult) = useSubAgent
+                ? await _reviewAgent.ReviewWithLineCommentsAsync(owner, repo, prNumber, language: null, cancellationToken)
+                : await _reviewAgent.ReviewDirectAsync(owner, repo, prNumber, language: null, cancellationToken);
 
             return new ApprovalResult
             {
@@ -135,11 +178,13 @@ public class SKAgentOrchestratorService : IAgentOrchestratorService
         CancellationToken cancellationToken = default)
     {
         var useFunctionCalling = _config.AgentFramework?.EnableFunctionCalling ?? false;
+        var useSubAgent = _config.AgentFramework?.UseSubAgent ?? true;
 
         if (useFunctionCalling)
         {
-            var (reviewText, actionResult) = await _reviewAgent.ReviewWithLineCommentsAsync(
-                owner, repo, prNumber, language, cancellationToken);
+            var (reviewText, actionResult) = useSubAgent
+                ? await _reviewAgent.ReviewWithLineCommentsAsync(owner, repo, prNumber, language, cancellationToken)
+                : await _reviewAgent.ReviewDirectAsync(owner, repo, prNumber, language, cancellationToken);
 
             return new ApprovalResult
             {

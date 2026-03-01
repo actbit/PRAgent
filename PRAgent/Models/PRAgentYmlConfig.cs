@@ -76,6 +76,13 @@ public class AgentFrameworkConfig
     public bool EnableAutoApproval { get; set; } = false;
 
     /// <summary>
+    /// SubAgent（DetailedCommentAgent）を使用するかどうか
+    /// true: ReviewAgentがFunction CallingでDetailedCommentAgentを呼び出し
+    /// false: ReviewAgentだけで完結（Function Callingで直接コメント投稿）
+    /// </summary>
+    public bool UseSubAgent { get; set; } = false;
+
+    /// <summary>
     /// 最大ターン数（AgentGroupChat用）
     /// </summary>
     public int MaxTurns { get; set; } = 10;

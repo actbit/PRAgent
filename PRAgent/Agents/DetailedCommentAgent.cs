@@ -1,14 +1,13 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using PRAgent.Models;
 using PRAgent.Services;
 
 namespace PRAgent.Agents;
 
 /// <summary>
 /// 詳細な行コメントを作成するサブエージェント
-/// ReviewAgentが作成した概要から、具体的な行コメントを生成
+/// ReviewAgentからFunction Callingで呼び出され、個々の問題について詳細なコメントを生成
 /// </summary>
 public class DetailedCommentAgent : IDetailedCommentAgent
 {
@@ -33,7 +32,103 @@ public class DetailedCommentAgent : IDetailedCommentAgent
     }
 
     /// <summary>
-    /// レビュー概要から詳細な行コメントを作成
+    /// 個々の問題について詳細なコメントを生成（Function Calling用）
+    /// </summary>
+    /// <param name="filePath">ファイルパス</param>
+    /// <param name="lineNumber">行番号</param>
+    /// <param name="codeSnippet">周辺コード</param>
+    /// <param name="issueSummary">問題の概要</param>
+    /// <returns>詳細なコメント（JSON形式）</returns>
+    [KernelFunction("get_detailed_comment")]
+    public async Task<string> GetDetailedCommentAsync(
+        string filePath,
+        int lineNumber,
+        string codeSnippet,
+        string issueSummary)
+    {
+        var systemPrompt = GetDetailedCommentPrompt(_language);
+        var kernel = _kernelService.CreateAgentKernel(systemPrompt);
+
+        var prompt = $$"""
+            以下のコードの問題点について、GitHubのプルリクエストレビュー用の詳細なコメントを作成してください。
+
+            ## ファイル情報
+            - ファイルパス: {{filePath}}
+            - 行番号: {{lineNumber}}
+
+            ## 対象コード
+            ```
+            {{codeSnippet}}
+            ```
+
+            ## 問題の概要
+            {{issueSummary}}
+
+            ## 出力形式（JSON）
+            以下の形式で出力してください：
+            ```json
+            {
+              "path": "{{filePath}}",
+              "line": {{lineNumber}},
+              "body": "詳細なコメント本文",
+              "suggestion": "修正提案のコード（あれば）"
+            }
+            ```
+
+            重要: 必ず有効なJSONオブジェクトのみを出力してください。
+            """;
+
+        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+        var chatHistory = new ChatHistory();
+        chatHistory.AddUserMessage(prompt);
+
+        var response = await chatService.GetChatMessageContentsAsync(chatHistory, executionSettings: null, kernel);
+        var responseText = response.FirstOrDefault()?.Content ?? "{}";
+
+        _logger.LogInformation("=== DetailedCommentAgent Response for {File}:{Line} ===\n{Response}",
+            filePath, lineNumber, responseText);
+
+        return responseText;
+    }
+
+    /// <summary>
+    /// 複数の問題について一括で詳細コメントを生成（バッチ処理用）
+    /// </summary>
+    public async Task<List<LineCommentData>> CreateDetailedCommentsAsync(
+        List<IssueContext> issues,
+        string language)
+    {
+        SetLanguage(language);
+        var results = new List<LineCommentData>();
+
+        foreach (var issue in issues)
+        {
+            try
+            {
+                var jsonResult = await GetDetailedCommentAsync(
+                    issue.FilePath,
+                    issue.LineNumber,
+                    issue.CodeSnippet,
+                    issue.IssueSummary);
+
+                var comment = ParseSingleCommentFromJson(jsonResult);
+                if (comment != null)
+                {
+                    results.Add(comment);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create detailed comment for {File}:{Line}",
+                    issue.FilePath, issue.LineNumber);
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// レビュー概要から詳細な行コメントを作成（従来のメソッド、互換性のため残す）
     /// </summary>
     public async Task<List<LineCommentData>> CreateCommentsAsync(string reviewOverview, string language)
     {
@@ -77,12 +172,42 @@ public class DetailedCommentAgent : IDetailedCommentAgent
 
         _logger.LogInformation("=== DetailedCommentAgent Response ===\n{Response}", responseText);
 
-        // JSONをパース
         return ParseCommentsFromJson(responseText);
     }
 
     /// <summary>
-    /// JSONから行コメントデータをパース
+    /// 単一のJSONオブジェクトから行コメントデータをパース
+    /// </summary>
+    private LineCommentData? ParseSingleCommentFromJson(string json)
+    {
+        try
+        {
+            // コードブロック内のJSONを探す
+            var codeBlockMatch = System.Text.RegularExpressions.Regex.Match(json, @"```(?:json)?\s*([\s\S]*?)```");
+            if (codeBlockMatch.Success)
+            {
+                json = codeBlockMatch.Groups[1].Value.Trim();
+            }
+
+            // JSONオブジェクトを探す
+            var jsonMatch = System.Text.RegularExpressions.Regex.Match(json, @"\{[\s\S]*?\}");
+            if (!jsonMatch.Success)
+            {
+                _logger.LogWarning("No valid JSON object found in response");
+                return null;
+            }
+
+            return System.Text.Json.JsonSerializer.Deserialize<LineCommentData>(jsonMatch.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to parse single comment from JSON");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// JSON配列から行コメントデータをパース
     /// </summary>
     private List<LineCommentData> ParseCommentsFromJson(string json)
     {
@@ -128,16 +253,17 @@ public class DetailedCommentAgent : IDetailedCommentAgent
                 あなたはGitHubのプルリクエストレビュー用の詳細コメントを作成する専門家です。
 
                 ## 役割
-                レビュー概要から、具体的な行コメントを抽出・生成
+                指定されたコードの問題点について、詳細なコメントを生成
 
                 ## 出力ルール
-                1. 有効なJSON配列のみを出力
-                2. 各コメントには以下を含める:
-                   - path: ファイルパス
-                   - line: 行番号
-                   - body: コメント本文
+                1. 有効なJSONオブジェクトのみを出力
+                2. コメントには以下を含める:
+                   - path: ファイルパス（入力と同じ値）
+                   - line: 行番号（入力と同じ値）
+                   - body: 詳細なコメント本文
                    - suggestion: 修正提案（オプション）
-                3. コメントは簡潔かつ建設的に
+                3. コメントは建設的で、修正方法を具体的に提示
+                4. コードスニペットを参照して、具体的な改善案を提示
                 """;
         }
         else
@@ -146,16 +272,17 @@ public class DetailedCommentAgent : IDetailedCommentAgent
                 You are an expert at creating detailed line comments for GitHub pull request reviews.
 
                 ## Your Role
-                Extract and generate specific line comments from review overview.
+                Generate detailed comments for specified code issues.
 
                 ## Output Rules
-                1. Output only valid JSON array
-                2. Each comment should include:
-                   - path: file path
-                   - line: line number
-                   - body: comment body
+                1. Output only valid JSON object
+                2. Include in comment:
+                   - path: file path (same as input)
+                   - line: line number (same as input)
+                   - body: detailed comment body
                    - suggestion: fix suggestion (optional)
-                3. Keep comments concise and constructive
+                3. Keep comments constructive with specific improvement suggestions
+                4. Reference the code snippet and provide concrete fixes
                 """;
         }
     }
