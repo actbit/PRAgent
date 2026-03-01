@@ -1,6 +1,7 @@
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using PRAgent.Services;
 
 namespace PRAgent.Agents;
@@ -56,89 +57,29 @@ public class PRAgentFactory
     }
 
     /// <summary>
-    /// Summaryエージェントを作成
+    /// Reviewエージェント用のKernelを作成（FunctionCalling有効）
     /// </summary>
-    public async Task<ChatCompletionAgent> CreateSummaryAgentAsync(
-        string owner,
-        string repo,
-        int prNumber,
-        string? customSystemPrompt = null,
-        IEnumerable<KernelFunction>? functions = null)
-    {
-        var kernel = _kernelService.CreateAgentKernel(AgentDefinition.SummaryAgent.SystemPrompt);
-
-        if (functions != null)
-        {
-            foreach (var function in functions)
-            {
-                kernel.ImportPluginFromObject(function);
-            }
-        }
-
-        var agent = new ChatCompletionAgent
-        {
-            Name = AgentDefinition.SummaryAgent.Name,
-            Description = AgentDefinition.SummaryAgent.Description,
-            Instructions = customSystemPrompt ?? AgentDefinition.SummaryAgent.SystemPrompt,
-            Kernel = kernel
-        };
-
-        return await Task.FromResult(agent);
-    }
-
-    /// <summary>
-    /// Approvalエージェントを作成
-    /// </summary>
-    public async Task<ChatCompletionAgent> CreateApprovalAgentAsync(
-        string owner,
-        string repo,
-        int prNumber,
-        string? customSystemPrompt = null,
-        IEnumerable<KernelFunction>? functions = null)
-    {
-        var kernel = CreateApprovalKernel(owner, repo, prNumber, customSystemPrompt);
-
-        // GitHub操作用のプラグインを登録
-        if (functions != null)
-        {
-            foreach (var function in functions)
-            {
-                kernel.ImportPluginFromObject(function);
-            }
-        }
-
-        var agent = new ChatCompletionAgent
-        {
-            Name = AgentDefinition.ApprovalAgent.Name,
-            Description = AgentDefinition.ApprovalAgent.Description,
-            Instructions = customSystemPrompt ?? AgentDefinition.ApprovalAgent.SystemPrompt,
-            Kernel = kernel,
-            Arguments = new KernelArguments
-            {
-                // Approvalエージェント用の特殊設定
-                ["approval_mode"] = true,
-                ["owner"] = owner,
-                ["repo"] = repo,
-                ["pr_number"] = prNumber,
-                // FunctionCallingを自動的に有効にする
-                ["function_choice_behavior"] = "auto"
-            }
-        };
-
-        return await Task.FromResult(agent);
-    }
-
-    /// <summary>
-    /// Approvalエージェント用のKernelを作成
-    /// </summary>
-    public Kernel CreateApprovalKernel(
+    public Kernel CreateReviewKernel(
         string owner,
         string repo,
         int prNumber,
         string? customSystemPrompt = null)
     {
         return _kernelService.CreateAgentKernel(
-            customSystemPrompt ?? AgentDefinition.ApprovalAgent.SystemPrompt);
+            customSystemPrompt ?? AgentDefinition.ReviewAgent.SystemPrompt);
+    }
+
+    /// <summary>
+    /// Approvalエージェント用のKernelを作成（後方互換性のため残す）
+    /// </summary>
+    [Obsolete("Use CreateReviewKernel instead. Approval functionality is now integrated into ReviewAgent.")]
+    public Kernel CreateApprovalKernel(
+        string owner,
+        string repo,
+        int prNumber,
+        string? customSystemPrompt = null)
+    {
+        return CreateReviewKernel(owner, repo, prNumber, customSystemPrompt);
     }
 
     /// <summary>
@@ -174,23 +115,5 @@ public class PRAgentFactory
         };
 
         return await Task.FromResult(agent);
-    }
-
-    /// <summary>
-    /// 複数のエージェントを一度に作成
-    /// </summary>
-    public async Task<(ChatCompletionAgent reviewAgent, ChatCompletionAgent summaryAgent, ChatCompletionAgent approvalAgent)> CreateAllAgentsAsync(
-        string owner,
-        string repo,
-        int prNumber,
-        string? customReviewPrompt = null,
-        string? customSummaryPrompt = null,
-        string? customApprovalPrompt = null)
-    {
-        var reviewAgent = await CreateReviewAgentAsync(owner, repo, prNumber, customReviewPrompt);
-        var summaryAgent = await CreateSummaryAgentAsync(owner, repo, prNumber, customSummaryPrompt);
-        var approvalAgent = await CreateApprovalAgentAsync(owner, repo, prNumber, customApprovalPrompt);
-
-        return (reviewAgent, summaryAgent, approvalAgent);
     }
 }

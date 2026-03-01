@@ -4,6 +4,7 @@ namespace PRAgent.Services;
 
 /// <summary>
 /// エージェントオーケストレーションサービスのインターフェース
+/// ReviewAgentを中心に簡素化された構成
 /// </summary>
 public interface IAgentOrchestratorService
 {
@@ -13,9 +14,9 @@ public interface IAgentOrchestratorService
     Task<string> ReviewAsync(string owner, string repo, int prNumber, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// プルリクエストの要約を作成します
+    /// プルリクエストのコードレビューを実行します（language指定）
     /// </summary>
-    Task<string> SummarizeAsync(string owner, string repo, int prNumber, CancellationToken cancellationToken = default);
+    Task<string> ReviewAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// レビューと承認を一連のワークフローとして実行します
@@ -26,16 +27,6 @@ public interface IAgentOrchestratorService
         int prNumber,
         ApprovalThreshold threshold = ApprovalThreshold.Minor,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// プルリクエストのコードレビューを実行します（language指定）
-    /// </summary>
-    Task<string> ReviewAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// プルリクエストの要約を作成します（language指定）
-    /// </summary>
-    Task<string> SummarizeAsync(string owner, string repo, int prNumber, string language, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// レビューと承認を一連のワークフローとして実行します（language指定）

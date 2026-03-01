@@ -181,8 +181,13 @@ public class AgentDefinition
             - Code organization and readability
             - Adherence to best practices and design patterns
             - Test coverage and quality
+
+            After completing the review, you can:
+            - Approve the PR if no major issues are found
+            - Request changes if there are issues that need to be addressed
+            - Add line comments for specific issues
             """,
-        description: "Reviews pull requests for code quality, security, and best practices"
+        description: "Reviews pull requests for code quality, security, and best practices. Can approve or request changes."
     );
 
     public static AgentDefinition DetailedCommentAgent => new(
@@ -212,45 +217,5 @@ public class AgentDefinition
             }
             """,
         description: "Creates structured review comments for detailed line-by-line review"
-    );
-
-    public static AgentDefinition ApprovalAgent => new(
-        name: "ApprovalAgent",
-        role: "Approval Authority",
-        systemPrompt: """
-            あなたはプルリクエストの承認決定を行うシニアテクニカルリードです。
-
-            あなたの役割:
-            1. コードレビュー結果を分析
-            2. 承認基準に照らして評価
-            3. 保守的でリスクを考慮した承認決定を行う
-            4. 判断について明確な理由を提供
-
-            承認基準:
-            - critical: 重大な問題が0件であること
-            - major: 重大または重大な問題が0件であること
-            - minor: 軽微、重大、重大な問題が0件であること
-            - none: 常に承認
-
-            不確実な場合は、慎重を期して追加レビューまたは変更依頼を推奨します。
-            """,
-        description: "Makes approval decisions based on review results and configured thresholds"
-    );
-
-    public static AgentDefinition SummaryAgent => new(
-        name: "SummaryAgent",
-        role: "Technical Writer",
-        systemPrompt: """
-            You are a technical writer specializing in creating clear, concise documentation.
-
-            Your role is to:
-            1. Summarize pull request changes accurately
-            2. Highlight the purpose and impact of changes
-            3. Assess risk levels objectively
-            4. Identify areas needing special testing attention
-
-            Keep summaries under 300 words. Use markdown formatting with bullet points for readability.
-            """,
-        description: "Creates concise summaries of pull request changes"
     );
 }

@@ -73,8 +73,6 @@ public static class ServiceCollectionExtensions
         // SK Agents (Semantic Kernel Agent Framework)
         services.AddSingleton<PRAgentFactory>();
         services.AddSingleton<SKReviewAgent>();
-        services.AddSingleton<SKSummaryAgent>();
-        services.AddSingleton<SKApprovalAgent>();
 
         // Agent Orchestrator - SKAgentOrchestratorServiceを使用
         services.AddSingleton<IAgentOrchestratorService, SKAgentOrchestratorService>();

@@ -63,14 +63,10 @@ public class PRAnalysisService : IPRAnalysisService
             return "PRAgent is disabled for this repository.";
         }
 
-        if (config.Summary == null || !config.Summary.Enabled)
-        {
-            return "Summary is disabled for this repository.";
-        }
-
+        // SummaryAgentは廃止されたため、ReviewAgentを使用
         var summary = !string.IsNullOrEmpty(language)
-            ? await _agentOrchestrator.SummarizeAsync(owner, repo, prNumber, language)
-            : await _agentOrchestrator.SummarizeAsync(owner, repo, prNumber);
+            ? await _agentOrchestrator.ReviewAsync(owner, repo, prNumber, language)
+            : await _agentOrchestrator.ReviewAsync(owner, repo, prNumber);
 
         if (postComment)
         {
